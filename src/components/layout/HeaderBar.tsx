@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuthStore, useTranslation } from "@/store/authStore";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import PasswordChangeModal from "@/components/ui/PasswordChangeModal";
 
 // ─── Route to Breadcrumb Map ──────────────────────────────────────────────────
 
@@ -57,8 +58,11 @@ const routeLabelMap: Record<string, string> = {
   "/zones/new": "Crear Zona",
   "/zones/manage": "Manejar Zonas",
   "/accountable-entities": "Entidades Contables",
+  "/accountable-entities/new": "Crear Entidad",
   "/mail-receptors": "Receptores de Correo",
+  "/mail-receptors/new": "Crear Receptor",
   "/notifications/new": "Notificaciones",
+  "/settings": "Configuracion",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -72,6 +76,7 @@ export default function HeaderBar() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Live clock
   useEffect(() => {
@@ -148,6 +153,7 @@ export default function HeaderBar() {
 
           {/* Settings */}
           <button
+            onClick={() => window.location.href = "/#/settings"}
             className="p-2 rounded-lg text-[#666666] hover:text-[#4ECDC4] hover:bg-[#F5F5F0] transition-colors"
             title={t("header.settings")}
           >
@@ -205,7 +211,10 @@ export default function HeaderBar() {
                       </p>
                     </div>
                     <button
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        setShowPasswordModal(true);
+                      }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#666666] hover:bg-[#F5F5F0] hover:text-[#333333] transition-colors text-left"
                     >
                       <Lock size={14} />
@@ -305,6 +314,12 @@ export default function HeaderBar() {
           logout();
         }}
         onCancel={() => setShowLogoutDialog(false)}
+      />
+
+      {/* Password Change Modal */}
+      <PasswordChangeModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
       />
     </>
   );
