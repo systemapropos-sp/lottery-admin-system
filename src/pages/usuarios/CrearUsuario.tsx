@@ -77,15 +77,6 @@ export default function CrearUsuario() {
     );
   };
 
-  const togglePrivilege = (priv: string) => {
-    setCheckedPrivileges((prev) => {
-      const next = new Set(prev);
-      if (next.has(priv)) next.delete(priv);
-      else next.add(priv);
-      return next;
-    });
-  };
-
   const selectAllInCategory = (category: PrivilegeCategory) => {
     setCheckedPrivileges((prev) => {
       const next = new Set(prev);

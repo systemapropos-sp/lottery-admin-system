@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Calendar } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { transactions, bettingPools } from "@/data/mockData";
+import { transactions } from "@/data/mockData";
 
 interface GrupoRow {
   grupoId: string;

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, ChevronDown, Settings } from "lucide-react";
+import { ChevronDown, Settings } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import DataTable from "@/components/ui/DataTable";
 import { bettingPools, zones } from "@/data/mockData";
@@ -22,10 +22,6 @@ export default function AccesoBancas() {
 
   const togglePool = (id: string) => {
     setActiveToggles((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString("en-US", { style: "currency", currency: "USD" });
   };
 
   const filteredData = useMemo(() => {

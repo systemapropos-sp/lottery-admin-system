@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Unlock, AlertTriangle, Check } from "lucide-react";
+import { Lock, Unlock, Check } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];

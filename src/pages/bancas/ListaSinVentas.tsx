@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, ChevronDown, FileText, Eye } from "lucide-react";
+import { ChevronDown, FileText, Eye } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { bettingPools, zones } from "@/data/mockData";
 

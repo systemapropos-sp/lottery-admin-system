@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Check } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { bettingPools, zones, lotteries } from "@/data/mockData";
 

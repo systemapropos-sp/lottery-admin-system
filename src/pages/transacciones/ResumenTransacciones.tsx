@@ -166,7 +166,7 @@ export default function ResumenTransacciones() {
           <h3 className="text-lg font-semibold text-[#333333] mb-4">Por Categoria</h3>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={porCategoriaData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
+              <Pie data={porCategoriaData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ percent }) => `${(percent * 100).toFixed(0)}%`}>
                 {porCategoriaData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}

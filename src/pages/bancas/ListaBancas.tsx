@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, ChevronDown, Pencil, Eye, Trash2 } from "lucide-react";
+import { Search, ChevronDown } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import DataTable from "@/components/ui/DataTable";
 import { bettingPools, zones } from "@/data/mockData";
@@ -62,7 +62,7 @@ export default function ListaBancas() {
     {
       key: "numero",
       header: "Numero",
-      accessor: (_row: BettingPool, idx: number) => idx + 1,
+      accessor: (_row: BettingPool) => 0,
       sortable: false,
       align: "center" as const,
       width: "60px",

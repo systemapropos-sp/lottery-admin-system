@@ -59,10 +59,10 @@ export default function BalanceBancos() {
                   className={`border-b border-[#E8E8E3] ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFAF8]"} hover:bg-[#F0F8F7]`}
                 >
                   <td className="px-4 py-4 text-[#333333] font-medium">{bank.name}</td>
-                  <td className="px-4 py-4 font-mono text-[13px] text-[#666666]">{bank.code}</td>
+                  <td className="px-4 py-4 font-mono text-[13px] text-[#666666]">{bank.id}</td>
                   <td className="px-4 py-4">
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                      {bank.zoneName}
+                      —
                     </span>
                   </td>
                   <td className="px-4 py-4 text-right">
