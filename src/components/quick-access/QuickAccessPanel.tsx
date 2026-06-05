@@ -27,7 +27,7 @@ import {
   Bell,
 } from "lucide-react";
 
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; color?: string }>> = {
   FileText,
   Wallet,
   BarChart3,
@@ -48,7 +48,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
 function QuickAccessIcon({ item, size = 24 }: { item: QuickAccessItem; size?: number }) {
   const IconComponent = ICON_MAP[item.icon];
   if (!IconComponent) return null;
-  return <IconComponent size={size} style={{ color: item.color }} />;
+  return <IconComponent size={size} color={item.color} />;
 }
 
 // ─── Overlay Variants ─────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ const panelVariants = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { type: "spring", stiffness: 300, damping: 28, delay: 0.05 },
+    transition: { type: "spring" as const, stiffness: 300, damping: 28, delay: 0.05 },
   },
   exit: { opacity: 0, y: 40, scale: 0.95, transition: { duration: 0.2 } },
 };
@@ -79,7 +79,7 @@ const cardVariants = {
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: 0.08 + i * 0.04, duration: 0.3, ease: "easeOut" },
+    transition: { delay: 0.08 + i * 0.04, duration: 0.3, ease: "easeOut" as const },
   }),
 };
 
