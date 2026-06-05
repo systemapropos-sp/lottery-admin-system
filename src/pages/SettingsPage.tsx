@@ -10,13 +10,16 @@ import {
   Moon,
   Sun,
   Save,
+  Zap,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { QuickAccessSettings } from "@/components/quick-access";
 
 const tabs = [
   { key: "password", label: "Cambiar contrasena", icon: Lock },
   { key: "preferences", label: "Preferencias", icon: Palette },
   { key: "language", label: "Idioma", icon: Globe },
+  { key: "quickaccess", label: "Accesos rapidos", icon: Zap },
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
@@ -469,6 +472,10 @@ export default function SettingsPage() {
                   interfaz.
                 </p>
               </motion.div>
+            )}
+            {/* ─── QUICK ACCESS TAB ───────────────────────────────────────────── */}
+            {activeTab === "quickaccess" && (
+              <QuickAccessSettings />
             )}
           </AnimatePresence>
         </div>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
+import { QuickAccessButton, QuickAccessPanel } from "@/components/quick-access";
 import Sidebar from "./Sidebar";
 import HeaderBar from "./HeaderBar";
 
@@ -35,6 +36,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           {children}
         </motion.div>
       </main>
+
+      {/* Quick Access System */}
+      <QuickAccessButton />
+      <QuickAccessPanel />
     </div>
   );
 }
