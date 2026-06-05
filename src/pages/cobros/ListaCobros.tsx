@@ -26,7 +26,7 @@ export default function ListaCobros() {
   const [showCreate, setShowCreate] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CobroRow | null>(null);
-  const [_deleteId, setDeleteId] = useState<string | null>(null);
+  const [, setDeleteId] = useState<string | null>(null);
 
   // Form state
   const [formTipo, setFormTipo] = useState("COBRO");

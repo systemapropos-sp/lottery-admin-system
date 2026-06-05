@@ -14,7 +14,15 @@ interface Receptor {
   emailTypes: string[];
 }
 
-
+const _allEmailTypes = [
+  "Reportes diarios",
+  "Alertas de seguridad",
+  "Resultados",
+  "Reportes de ventas",
+  "Notificaciones de sistema",
+  "Resumen semanal",
+];
+void _allEmailTypes;
 
 const receptoresData: Receptor[] = [
   {
