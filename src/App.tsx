@@ -5,6 +5,26 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import StubPage from "@/pages/StubPage";
 
+// ─── Ventas ─────────────────────────────────────────────────────────────────────
+import VentasDelDia from "@/pages/ventas/VentasDelDia";
+import VentasHistorico from "@/pages/ventas/VentasHistorico";
+import VentasPorFecha from "@/pages/ventas/VentasPorFecha";
+import PremiosPorJugada from "@/pages/ventas/PremiosPorJugada";
+import Porcentajes from "@/pages/ventas/Porcentajes";
+import VentasBancas from "@/pages/ventas/VentasBancas";
+import VentasZonas from "@/pages/ventas/VentasZonas";
+
+// ─── Tickets ────────────────────────────────────────────────────────────────────
+import CrearTicket from "@/pages/tickets/CrearTicket";
+import MonitoreoTickets from "@/pages/tickets/MonitoreoTickets";
+import Jugadas from "@/pages/tickets/Jugadas";
+import JugadasGanadoras from "@/pages/tickets/JugadasGanadoras";
+import Pizarra from "@/pages/tickets/Pizarra";
+import Anomalias from "@/pages/tickets/Anomalias";
+
+// ─── Resultados ─────────────────────────────────────────────────────────────────
+import Resultados from "@/pages/Resultados";
+
 // ─── Stub Route Helper ──────────────────────────────────────────────────────────
 
 function Stub({ title }: { title: string }) {
@@ -47,24 +67,24 @@ export default function App() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
       {/* ── VENTAS ─────────────────────────────────────────────── */}
-      <Route path="/sales/daily" element={<Stub title="Ventas del dia" />} />
-      <Route path="/sales/historical" element={<Stub title="Ventas Historico" />} />
-      <Route path="/sales/by-date" element={<Stub title="Ventas por fecha" />} />
-      <Route path="/sales/zones" element={<Stub title="Ventas por Zonas" />} />
-      <Route path="/play-type-prizes" element={<Stub title="Premios por jugada" />} />
-      <Route path="/play-type-prizes-percentages" element={<Stub title="Porcentajes" />} />
-      <Route path="/sales/betting-pool" element={<Stub title="Ventas por Banca" />} />
+      <Route path="/sales/daily" element={<Protected><VentasDelDia /></Protected>} />
+      <Route path="/sales/historical" element={<Protected><VentasHistorico /></Protected>} />
+      <Route path="/sales/by-date" element={<Protected><VentasPorFecha /></Protected>} />
+      <Route path="/sales/zones" element={<Protected><VentasZonas /></Protected>} />
+      <Route path="/play-type-prizes" element={<Protected><PremiosPorJugada /></Protected>} />
+      <Route path="/play-type-prizes-percentages" element={<Protected><Porcentajes /></Protected>} />
+      <Route path="/sales/betting-pool" element={<Protected><VentasBancas /></Protected>} />
 
       {/* ── TICKETS ────────────────────────────────────────────── */}
-      <Route path="/tickets/create" element={<Stub title="Crear Ticket" />} />
-      <Route path="/tickets" element={<Stub title="Tickets" />} />
-      <Route path="/play-amounts" element={<Stub title="Jugadas" />} />
-      <Route path="/winning-plays" element={<Stub title="Jugadas ganadoras" />} />
-      <Route path="/blackboard" element={<Stub title="Pizarra" />} />
-      <Route path="/anomalies" element={<Stub title="Anomalias" />} />
+      <Route path="/tickets/create" element={<Protected><CrearTicket /></Protected>} />
+      <Route path="/tickets" element={<Protected><MonitoreoTickets /></Protected>} />
+      <Route path="/play-amounts" element={<Protected><Jugadas /></Protected>} />
+      <Route path="/winning-plays" element={<Protected><JugadasGanadoras /></Protected>} />
+      <Route path="/blackboard" element={<Protected><Pizarra /></Protected>} />
+      <Route path="/anomalies" element={<Protected><Anomalias /></Protected>} />
 
       {/* ── RESULTADOS ─────────────────────────────────────────── */}
-      <Route path="/results" element={<Stub title="Resultados" />} />
+      <Route path="/results" element={<Protected><Resultados /></Protected>} />
 
       {/* ── BANCAS ─────────────────────────────────────────────── */}
       <Route path="/betting-pools" element={<Stub title="Bancas" />} />
