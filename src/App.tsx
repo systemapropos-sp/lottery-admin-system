@@ -5,6 +5,18 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import StubPage from "@/pages/StubPage";
 
+// Sorteos
+import ListaSorteos from "@/pages/sorteos/ListaSorteos";
+import HorarioSorteos from "@/pages/sorteos/HorarioSorteos";
+
+// F8 Monitoreo
+import F8Monitoreo from "@/pages/F8Monitoreo";
+
+// Zonas
+import ListaZonas from "@/pages/zonas/ListaZonas";
+import CrearZona from "@/pages/zonas/CrearZona";
+import ManejarZonas from "@/pages/zonas/ManejarZonas";
+
 // ─── Stub Route Helper ──────────────────────────────────────────────────────────
 
 function Stub({ title }: { title: string }) {
@@ -103,16 +115,16 @@ export default function App() {
       <Route path="/limits/automatic" element={<Stub title="Limites automaticos" />} />
 
       {/* ── SORTEOS ────────────────────────────────────────────── */}
-      <Route path="/sortition-informations" element={<Stub title="Sorteos" />} />
-      <Route path="/sortition-schedules" element={<Stub title="Horario de Sorteos" />} />
+      <Route path="/sortition-informations" element={<Protected><ListaSorteos /></Protected>} />
+      <Route path="/sortition-schedules" element={<Protected><HorarioSorteos /></Protected>} />
 
       {/* ── F8 MONITOREO ───────────────────────────────────────── */}
-      <Route path="/betting-pool-play-monitor" element={<Stub title="Monitoreo de Jugadas [F8]" />} />
+      <Route path="/betting-pool-play-monitor" element={<Protected><F8Monitoreo /></Protected>} />
 
       {/* ── ZONAS ──────────────────────────────────────────────── */}
-      <Route path="/zones" element={<Stub title="Zonas" />} />
-      <Route path="/zones/new" element={<Stub title="Crear Zona" />} />
-      <Route path="/zones/manage" element={<Stub title="Manejar Zonas" />} />
+      <Route path="/zones" element={<Protected><ListaZonas /></Protected>} />
+      <Route path="/zones/new" element={<Protected><CrearZona /></Protected>} />
+      <Route path="/zones/manage" element={<Protected><ManejarZonas /></Protected>} />
 
       {/* ── ENTIDADES ──────────────────────────────────────────── */}
       <Route path="/accountable-entities" element={<Stub title="Entidades Contables" />} />
