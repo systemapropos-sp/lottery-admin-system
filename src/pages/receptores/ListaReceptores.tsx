@@ -1,11 +1,9 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import { Search, Pencil, Trash2, Plus } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, Mail } from "lucide-react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-
-// ─── Types & Mock Data ────────────────────────────────────────────────────────
 
 interface Receptor {
   id: string;
@@ -14,114 +12,56 @@ interface Receptor {
   emailTypes: string[];
 }
 
-const _allEmailTypes = [
-  "Reportes diarios",
-  "Alertas de seguridad",
-  "Resultados",
-  "Reportes de ventas",
-  "Notificaciones de sistema",
-  "Resumen semanal",
-];
-void _allEmailTypes;
-
 const receptoresData: Receptor[] = [
   {
     id: "rec-001",
-    email: "admin@lottery.com",
-    zones: ["Default", "SFM"],
-    emailTypes: ["Reportes diarios", "Alertas de seguridad"],
-  },
-  {
-    id: "rec-002",
-    email: "operaciones@lottery.com",
-    zones: ["SFM"],
-    emailTypes: ["Resultados", "Reportes de ventas"],
-  },
-  {
-    id: "rec-003",
-    email: "soporte@lottery.com",
-    zones: ["Default"],
-    emailTypes: ["Notificaciones de sistema", "Alertas de seguridad"],
-  },
-  {
-    id: "rec-004",
-    email: "ventas@lottery.com",
-    zones: ["Default", "SFM"],
-    emailTypes: ["Reportes de ventas", "Resumen semanal"],
-  },
-  {
-    id: "rec-005",
-    email: "gerencia@lottery.com",
-    zones: ["Default"],
-    emailTypes: ["Reportes diarios", "Resultados", "Resumen semanal"],
-  },
-  {
-    id: "rec-006",
-    email: "alertas@lottery.com",
-    zones: ["SFM"],
-    emailTypes: ["Alertas de seguridad", "Notificaciones de sistema"],
+    email: "smartboyslab@gmail.com",
+    zones: ["General"],
+    emailTypes: ["Reportes diarios", "Alertas de seguridad", "Resultados", "Reportes de ventas"],
   },
 ];
 
-const zoneBadgeColors: Record<string, string> = {
-  Default: "bg-[#F5F5F0] text-[#666666]",
-  SFM: "bg-[#E0F2FE] text-[#0369A1]",
-};
-
-const typeBadgeColors: Record<string, string> = {
-  "Reportes diarios": "bg-[#E0F7F5] text-[#0F766E]",
-  "Alertas de seguridad": "bg-[#FEE2E2] text-[#991B1B]",
-  Resultados: "bg-[#E0E7FF] text-[#3730A3]",
-  "Reportes de ventas": "bg-[#ECFCCB] text-[#3F6212]",
-  "Notificaciones de sistema": "bg-[#F3E8FF] text-[#6B21A8]",
-  "Resumen semanal": "bg-[#FEF9C3] text-[#854D0E]",
-};
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function ListaReceptores() {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState("");
-  const [data, setData] = useState(receptoresData);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [receptores, setReceptores] = useState<Receptor[]>(receptoresData);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Receptor | null>(null);
 
-  const filteredData = useMemo(() => {
-    if (!filter.trim()) return data;
-    const lower = filter.toLowerCase();
-    return data.filter(
-      (r) =>
-        r.email.toLowerCase().includes(lower) ||
-        r.zones.some((z) => z.toLowerCase().includes(lower)) ||
-        r.emailTypes.some((t) => t.toLowerCase().includes(lower))
-    );
-  }, [data, filter]);
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return receptores;
+    const q = searchQuery.toLowerCase();
+    return receptores.filter((r) => r.email.toLowerCase().includes(q));
+  }, [receptores, searchQuery]);
 
-  const handleDelete = (id: string) => {
-    setData((prev) => prev.filter((r) => r.id !== id));
+  function handleDelete(r: Receptor) {
+    setReceptores((prev) => prev.filter((x) => x.id !== r.id));
     setDeleteTarget(null);
-  };
+  }
 
   const columns: Column<Receptor>[] = [
     {
       key: "email",
-      header: "Correo",
-      accessor: (row) => row.email,
+      header: "Correo Electronico",
+      accessor: (r) => r.email,
       sortable: true,
+      cell: (r) => (
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+            <Mail size={14} className="text-teal-600" />
+          </div>
+          <span className="font-medium text-[#333333]">{r.email}</span>
+        </div>
+      ),
     },
     {
       key: "zones",
       header: "Zonas",
-      accessor: (row) => row.zones.join(", "),
-      cell: (row) => (
+      accessor: (r) => r.zones.join(", "),
+      cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          {row.zones.map((zone) => (
-            <span
-              key={zone}
-              className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                zoneBadgeColors[zone] ?? "bg-[#F5F5F0] text-[#666666]"
-              }`}
-            >
-              {zone}
+          {r.zones.map((z) => (
+            <span key={z} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
+              {z}
             </span>
           ))}
         </div>
@@ -129,18 +69,13 @@ export default function ListaReceptores() {
     },
     {
       key: "emailTypes",
-      header: "Tipos de correo",
-      accessor: (row) => row.emailTypes.join(", "),
-      cell: (row) => (
-        <div className="flex flex-wrap gap-1 max-w-[280px]">
-          {row.emailTypes.map((type) => (
-            <span
-              key={type}
-              className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                typeBadgeColors[type] ?? "bg-[#F5F5F0] text-[#666666]"
-              }`}
-            >
-              {type}
+      header: "Tipos de Correo",
+      accessor: (r) => r.emailTypes.join(", "),
+      cell: (r) => (
+        <div className="flex flex-wrap gap-1">
+          {r.emailTypes.map((t) => (
+            <span key={t} className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+              {t}
             </span>
           ))}
         </div>
@@ -151,27 +86,22 @@ export default function ListaReceptores() {
       header: "Acciones",
       accessor: () => "",
       align: "center",
-      cell: (row) => (
+      width: "100px",
+      cell: (r) => (
         <div className="flex items-center justify-center gap-1">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/mail-receptors/new?edit=${row.id}`);
-            }}
-            className="p-1.5 rounded-lg text-[#999999] hover:text-[#3B82F6] hover:bg-[rgba(59,130,246,0.1)] transition-colors"
+            onClick={() => navigate("/mail-receptors/new")}
+            className="p-1.5 rounded-lg text-[#666666] hover:text-[#4ECDC4] hover:bg-[rgba(78,205,196,0.1)] transition-colors"
             title="Editar"
           >
-            <Pencil size={16} />
+            <Pencil size={14} />
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeleteTarget(row.id);
-            }}
-            className="p-1.5 rounded-lg text-[#999999] hover:text-[#EF4444] hover:bg-[rgba(239,68,68,0.1)] transition-colors"
+            onClick={() => setDeleteTarget(r)}
+            className="p-1.5 rounded-lg text-[#666666] hover:text-[#EF4444] hover:bg-[rgba(239,68,68,0.1)] transition-colors"
             title="Eliminar"
           >
-            <Trash2 size={16} />
+            <Trash2 size={14} />
           </button>
         </div>
       ),
@@ -179,66 +109,50 @@ export default function ListaReceptores() {
   ];
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }} className="space-y-6"
+    >
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#333333]">Receptores de Correo</h1>
-          <p className="text-sm text-[#666666] mt-0.5">
-            Gestion de direcciones de correo para notificaciones y reportes
-          </p>
+          <p className="text-sm text-[#666666] mt-0.5">Gestiona quienes reciben reportes y alertas del sistema</p>
         </div>
-        <button
-          onClick={() => navigate("/mail-receptors/new")}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4ECDC4] text-white text-sm font-medium rounded-full hover:bg-[#3DBDB5] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_2px_8px_rgba(78,205,196,0.3)] hover:shadow-[0_4px_12px_rgba(78,205,196,0.4)]"
+        <button onClick={() => navigate("/mail-receptors/new")}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#4ECDC4] text-white text-sm font-medium hover:bg-[#3DBDB5] transition-all shadow-[0_2px_8px_rgba(78,205,196,0.3)]"
         >
-          <Plus size={16} />
-          Crear receptor
+          <Plus size={15} /> Crear Receptor
         </button>
       </div>
 
-      {/* Table Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="bg-white rounded-xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5"
-      >
-        {/* Quick Filter */}
-        <div className="relative mb-4">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999]"
-          />
-          <input
-            type="text"
-            placeholder="Buscar correo, zona o tipo..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="w-full sm:w-80 pl-9 pr-4 py-2.5 bg-white border border-[#E5E5E0] rounded-lg text-sm text-[#333333] placeholder:text-[#999999] focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-all"
-          />
-        </div>
+      {/* Search */}
+      <div className="relative max-w-xs">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999]" />
+        <input type="text" placeholder="Buscar por correo..."
+          value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2.5 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] transition-all"
+        />
+      </div>
 
+      <div className="bg-white rounded-xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
         <DataTable
           columns={columns}
-          data={filteredData}
-          keyExtractor={(row) => row.id}
+          data={filtered}
+          keyExtractor={(r) => r.id}
           pageSize={10}
-          pageSizeOptions={[5, 10, 25, 50]}
+          emptyMessage="No hay receptores configurados"
         />
-      </motion.div>
+      </div>
 
-      {/* Delete Confirmation */}
       <ConfirmDialog
-        isOpen={deleteTarget !== null}
-        title="Eliminar receptor"
-        message="Esta seguro de que desea eliminar este receptor de correo? Esta accion no se puede deshacer."
-        variant="danger"
+        isOpen={!!deleteTarget}
+        title="Eliminar Receptor"
+        message={`¿Seguro que deseas eliminar "${deleteTarget?.email}"?`}
         confirmLabel="Eliminar"
         cancelLabel="Cancelar"
+        variant="danger"
         onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
         onCancel={() => setDeleteTarget(null)}
       />
-    </div>
+    </motion.div>
   );
 }

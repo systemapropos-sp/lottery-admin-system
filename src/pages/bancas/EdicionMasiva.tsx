@@ -1,258 +1,353 @@
-import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Save, ChevronDown } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { bettingPools, zones, lotteries } from "@/data/mockData";
 
-const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
+// ─── Data ─────────────────────────────────────────────────────────────────────
+const SORTEOS = ["LA PRIMERA","NEW YORK AM","NEW YORK PM","FLORIDA AM","FLORIDA PM","GANA MAS","NACIONAL","QUINIELA PALE","QUINIELA REAL","LOTEKA","SUPER PALE REAL-GANA MAS","SUPER PALE NACIONAL-QP","SUPER PALE NY-GANA MAS","SUPER PALE NY-NACIONAL","LA SUERTE","LOTEDOM","KING LOTTERY AM","KING LOTTERY PM","ANGUILA 1PM","ANGUILA 6PM","ANGUILA 9PM","ANGUILA 10AM","LA PRIMERA 7PM","LA SUERTE 6:00PM","TODOS"];
+const BANCAS  = Array.from({length:20},(_,i)=>i===0?"MATADOR-SPORT (1)":`MMW RD ${String(i+1).padStart(2,"0")} (${i+1})`);
+const ZONAS   = ["DEFAULT","SFM"];
 
-const tabs = ["Configuracion", "Pies de pagina", "Premios & Comisiones", "Sorteos"];
-
-interface ToggleParam {
-  label: string;
-  enabled: boolean;
-}
-
-const initialParams: ToggleParam[] = [
-  { label: "Balance de desactivacion", enabled: false },
-  { label: "Limite venta diaria", enabled: false },
-  { label: "Imprimir copia", enabled: true },
-  { label: "Activa", enabled: true },
-  { label: "Control tickets ganadores", enabled: false },
-  { label: "Usar premios normalizados", enabled: false },
-  { label: "Permitir pasar bote", enabled: false },
-  { label: "Minutos para cancelar", enabled: true },
-  { label: "Tickets a cancelar", enabled: true },
-  { label: "Idioma", enabled: true },
-  { label: "Modo impresion", enabled: true },
-  { label: "Proveedor descuento", enabled: false },
-  { label: "Permitir cambiar contrasena", enabled: true },
+const PRIZE_TYPES = [
+  {t:"DIRECTO",       s:"Todos en secuencia", f:["","Segundo Pago","Tercer Pago","Dobles"]},
+  {t:"PALE",          s:"Todos en secuencia", f:["Primer Pago","Segundo Pago","Tercer Pago"]},
+  {t:"TRIPLETA",      s:"Primer Pago",        f:["Segundo Pago","Triples"]},
+  {t:"CASH3 STRAIGHT",s:"Todos en secuencia", f:["Segundo Pago"]},
+  {t:"CASH3 BOX",     s:"3-Way; 2 idénticos", f:["6-Way; 3 únicos"]},
+  {t:"PLAY4 STRAIGHT",s:"Todos en secuencia", f:["Dobles"]},
+  {t:"PLAY4 BOX",     s:"34-Way; 4 idénticos",f:["12-Way; 2 idénticos","6-Way; 2 idénticos","4-Way; 3 idénticos"]},
+  {t:"SUPER PALE",    s:"Primer Pago",        f:[]},
+  {t:"BOLITA 1",      s:"Primer Pago",        f:[]},
+  {t:"BOLITA 2",      s:"Primer Pago",        f:[]},
+  {t:"SINGULACIÓN 1", s:"Primer Pago",        f:[]},
+  {t:"SINGULACIÓN 2", s:"Primer Pago",        f:[]},
+  {t:"SINGULACIÓN 3", s:"Primer Pago",        f:[]},
+  {t:"PICKS STRAIGHT",s:"5-Way; 4 idénticos", f:["Dobles"]},
+  {t:"PICKS BOX",     s:"5-Way; 4 idénticos", f:["10-Way; 3 idénticos","20-Way; 3 idénticos","30-Way; 2 idénticos","40-Way; 1 idéntico","120-Way; 6 únicos"]},
+  {t:"PICK TWO",      s:"Primer Pago",        f:["Dobles"]},
+  {t:"CASH3 COMBO",   s:"Primer Pago",        f:["Segundo Pago","Tercer Pago"]},
+  {t:"PLAY4 COMBO",   s:"Primer Pago",        f:["Segundo Pago","Tercer Pago","Aproximaciones"]},
+  {t:"CASH3 FRONT STRAIGHT",s:"Todos en secuencia",f:["Triples"]},
+  {t:"CASH3 FRONT BOX",s:"3-Way; 2 idénticos",f:["6-Way; 3 únicos"]},
+  {t:"CASH3 BACK STRAIGHT",s:"Todos en secuencia",f:["Triples"]},
+  {t:"CASH3 BACK BOX",s:"3-Way; 2 idénticos", f:["6-Way; 3 únicos"]},
+  {t:"IMPAR",         s:"Acertado",           f:[]},
+  {t:"PAR",           s:"Acertado",           f:[]},
+  {t:"PRIMEROS 50",   s:"Acertado",           f:[]},
+  {t:"ULTIMOS 50",    s:"Acertado",           f:[]},
+  {t:"PICK TWO FRONT",s:"Primer Pago",        f:["Dobles"]},
+  {t:"PICK TWO BACK", s:"Primer Pago",        f:["Dobles"]},
+  {t:"LOTO POOL",     s:"Acertar 1 número",   f:["Acertar 2 números","Acertar 3 números","Acertar 4 números"]},
+  {t:"LOTO FOUR 1",   s:"Todos en secuencia", f:[]},
+  {t:"LOTO FOUR 2",   s:"Todos en secuencia", f:[]},
+  {t:"LOTO FOUR 3",   s:"Todos en secuencia", f:[]},
+  {t:"EXTRA FIVE 1",  s:"Todos en secuencia", f:[]},
+  {t:"EXTRA FIVE 2",  s:"Todos en secuencia", f:[]},
+  {t:"EXTRA FIVE 3",  s:"Todos en secuencia", f:[]},
+  {t:"PICK TWO MIDDLE",s:"Primer Pago",       f:["Dobles"]},
+  {t:"PICK ONE",      s:"Primer Pago",        f:[]},
+  {t:"PANAMÁ",        s:"4 números primera ronda",f:["3 números primera ronda","3 números primera ronda","Último número primera ronda","4 números segunda ronda","3 números segunda ronda","Últimos 2 números segunda ronda","Último número segunda ronda"]},
+  {t:"PANAMÁ 1 RONDA",s:"4 números primera ronda",f:["3 números primera ronda","2 números primera ronda","Último número primera ronda"]},
+  {t:"PICK TWO",      s:"Primer Pago",        f:["Dobles"]},
+  {t:"PEGA 3",        s:"Triples",            f:["3-Way; 2 idénticos en orden","3-Way; 2 idénticos","6-Way; 3 únicos en orden","6-Way; 3 únicos"]},
+  {t:"DOBLES",        s:"Primer Pago",        f:[]},
 ];
 
-export default function EdicionMasiva() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [selectedZone, setSelectedZone] = useState("Todas");
-  const [params, setParams] = useState<ToggleParam[]>(initialParams);
-  const [selectedBanks, setSelectedBanks] = useState<Set<string>>(new Set(bettingPools.map((bp) => bp.id)));
-  const [selectedLotteries, setSelectedLotteries] = useState<Set<string>>(new Set());
+const TABS = ["Configuración","Pies de página","Premios & Comisiones","Sorteos"] as const;
+type Tab = typeof TABS[number];
 
-  const toggleParam = (idx: number) => {
-    setParams((prev) => prev.map((p, i) => (i === idx ? { ...p, enabled: !p.enabled } : p)));
-  };
+// ─── Toggle group (ENCENDER / APAGAR / NO CAMBIAR) ───────────────────────────
+type TVal = "on"|"off"|"nc";
+function ToggleGroup({value,onChange}:{value:TVal;onChange:(v:TVal)=>void}){
+  const btns:[TVal,string][] = [["on","ENCENDER"],["off","APAGAR"],["nc","NO CAMBIAR"]];
+  return(
+    <div className="flex rounded-lg overflow-hidden border border-[#E5E5E0]">
+      {btns.map(([v,label])=>(
+        <button key={v} onClick={()=>onChange(v)}
+          className={`px-3 py-1.5 text-xs font-semibold flex-1 transition-colors ${value===v?"bg-[#4ECDC4] text-white":"bg-white text-[#555] hover:bg-[#F5F5F0]"}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-  const toggleBank = (id: string) => {
-    setSelectedBanks((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+// ─── Two-button selector ───────────────────────────────────────────────────────
+function TwoBtn({opts,value,onChange}:{opts:[string,string];value:string;onChange:(v:string)=>void}){
+  return(
+    <div className="flex rounded-lg overflow-hidden border border-[#E5E5E0]">
+      {opts.map(o=>(
+        <button key={o} onClick={()=>onChange(o)}
+          className={`px-4 py-1.5 text-xs font-semibold flex-1 transition-colors ${value===o?"bg-[#4ECDC4] text-white":"bg-white text-[#555] hover:bg-[#F5F5F0]"}`}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-  const toggleLottery = (id: string) => {
-    setSelectedLotteries((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+// ─── Chip ─────────────────────────────────────────────────────────────────────
+function Chip({label,active,onClick}:{label:string;active:boolean;onClick:()=>void}){
+  return(
+    <button onClick={onClick}
+      className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors whitespace-nowrap ${active?"bg-[#4ECDC4]/20 text-[#0D9488] border-[#4ECDC4]":"bg-white text-[#555] border-[#E5E5E0] hover:border-[#4ECDC4]"}`}>
+      {label}
+    </button>
+  );
+}
 
-  const selectAllBanks = () => setSelectedBanks(new Set(bettingPools.map((bp) => bp.id)));
-  const deselectAllBanks = () => setSelectedBanks(new Set());
-
-  const selectAllLotteries = () => setSelectedLotteries(new Set(lotteries.map((l) => l.id)));
-  const deselectAllLotteries = () => setSelectedLotteries(new Set());
-
-  const filteredPools = useMemo(() => {
-    if (selectedZone === "Todas") return bettingPools;
-    const zone = zones.find((z) => z.name === selectedZone);
-    return zone ? bettingPools.filter((bp) => bp.zoneId === zone.id) : bettingPools;
-  }, [selectedZone]);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: easeOut }}
-      className="space-y-5"
-    >
-      <PageHeader
-        title="Edicion masiva de Bancas"
-        subtitle="Actualice la configuracion de multiples bancas simultaneamente"
-      />
-
-      {/* Zone Filter */}
-      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+// ─── Shared footer ────────────────────────────────────────────────────────────
+function SharedFooter({selSorteos,setSelSorteos,selBancas,setSelBancas,selZonas,setSelZonas,updGeneral,setUpdGeneral}:{
+  selSorteos:Set<string>;setSelSorteos:(s:Set<string>)=>void;
+  selBancas:Set<string>;setSelBancas:(s:Set<string>)=>void;
+  selZonas:Set<string>;setSelZonas:(s:Set<string>)=>void;
+  updGeneral:boolean;setUpdGeneral:(v:boolean)=>void;
+}){
+  const toggleS=(v:string)=>{const n=new Set(selSorteos);n.has(v)?n.delete(v):n.add(v);setSelSorteos(n);};
+  const toggleB=(v:string)=>{const n=new Set(selBancas);n.has(v)?n.delete(v):n.add(v);setSelBancas(n);};
+  const toggleZ=(v:string)=>{const n=new Set(selZonas);n.has(v)?n.delete(v):n.add(v);setSelZonas(n);};
+  return(
+    <div className="mt-6 space-y-4 pt-6 border-t border-[#E5E5E0]">
+      <div className="grid grid-cols-[80px_1fr] gap-3 items-start">
+        <span className="text-xs font-medium text-[#666] pt-1">Sorteos</span>
+        <div className="flex flex-wrap gap-1.5">{SORTEOS.map(s=><Chip key={s} label={s} active={selSorteos.has(s)} onClick={()=>toggleS(s)}/>)}</div>
+      </div>
+      <div className="grid grid-cols-[80px_1fr] gap-3 items-start">
+        <span className="text-xs font-medium text-[#666] pt-1">Bancas</span>
+        <div className="flex flex-wrap gap-1.5">{BANCAS.map(b=><Chip key={b} label={b} active={selBancas.has(b)} onClick={()=>toggleB(b)}/>)}</div>
+      </div>
+      <div className="grid grid-cols-[80px_1fr] gap-3 items-start">
+        <span className="text-xs font-medium text-[#666] pt-1">Zonas</span>
+        <div className="flex flex-wrap gap-1.5">{ZONAS.map(z=><Chip key={z} label={z} active={selZonas.has(z)} onClick={()=>toggleZ(z)}/>)}</div>
+      </div>
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-[#333333]">Zona:</span>
-          <select
-            value={selectedZone}
-            onChange={(e) => setSelectedZone(e.target.value)}
-            className="px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4]"
-          >
-            <option>Todas</option>
-            {zones.map((z) => (
-              <option key={z.id} value={z.name}>{z.name}</option>
-            ))}
-          </select>
-          <span className="text-sm text-[#999999] ml-2">
-            {filteredPools.length} bancas seleccionadas
-          </span>
+          <span className="text-xs font-medium text-[#666]">Actualizar valores generales</span>
+          <button onClick={()=>setUpdGeneral(!updGeneral)}
+            className={`w-11 h-6 rounded-full relative transition-colors ${updGeneral?"bg-[#4ECDC4]":"bg-[#CCC]"}`}>
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${updGeneral?"translate-x-5":"translate-x-0.5"}`}/>
+          </button>
+        </div>
+        <button className="flex items-center gap-2 px-8 py-2.5 bg-[#4ECDC4] text-white font-semibold text-sm rounded-full hover:bg-[#3DBDB5] shadow-sm transition-colors">
+          <Save size={14}/> ACTUALIZAR
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab: Configuración ───────────────────────────────────────────────────────
+function TabConfig({footer}:{footer:React.ReactNode}){
+  const [zona,setZona]=useState("");
+  const [idioma,setIdioma]=useState("ESPAÑOL");
+  const [impresion,setImpresion]=useState("DRIVER");
+  const [proveedor,setProveedor]=useState("GRUPO");
+  const [toggles,setToggles]=useState<Record<string,TVal>>({
+    copia:"nc",activa:"nc",tickets:"nc",premios:"nc",bote:"nc",contrasena:"nc"
+  });
+  const setT=(k:string)=>(v:TVal)=>setToggles(p=>({...p,[k]:v}));
+
+  const rows: {label:string;key:string}[] = [
+    {label:"Imprimir copia de ticket",key:"copia"},
+    {label:"Activa",key:"activa"},
+    {label:"Control de tickets ganadores",key:"tickets"},
+    {label:"Usar premios normalizados",key:"premios"},
+    {label:"Permitir pasar bote",key:"bote"},
+  ];
+
+  return(
+    <div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Left */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Zona</label>
+            <div className="relative">
+              <select value={zona} onChange={e=>setZona(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg appearance-none focus:outline-none focus:border-[#4ECDC4]">
+                <option value="">—</option>
+                {ZONAS.map(z=><option key={z} value={z}>{z}</option>)}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none"/>
+            </div>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Balance de desactivacion</label>
+            <input placeholder="Balance de desactivacion" className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Límite de venta diaria</label>
+            <input placeholder="Límite de venta diaria" className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+          </div>
+          {rows.map(r=>(
+            <div key={r.key} className="grid grid-cols-[160px_1fr] gap-3 items-center">
+              <label className="text-sm text-[#666]">{r.label}</label>
+              <ToggleGroup value={toggles[r.key]} onChange={setT(r.key)}/>
+            </div>
+          ))}
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Minutos para cancelar tickets</label>
+            <input className="w-32 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Tickets a cancelar por día</label>
+            <input className="w-32 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+          </div>
+        </div>
+        {/* Right */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Idioma</label>
+            <TwoBtn opts={["ESPAÑOL","INGLÉS"]} value={idioma} onChange={setIdioma}/>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Modo de impresión</label>
+            <TwoBtn opts={["DRIVER","GENÉRICO"]} value={impresion} onChange={setImpresion}/>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">Proveedor de descuento</label>
+            <TwoBtn opts={["GRUPO","RIFERO"]} value={proveedor} onChange={setProveedor}/>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-3 items-start">
+            <label className="text-sm text-[#666] pt-1.5">Permitir cambiar contraseña</label>
+            <div className="space-y-1">
+              <TwoBtn opts={["ENCENDER","APAGAR"]} value={toggles.contrasena==="on"?"ENCENDER":"APAGAR"} onChange={v=>setT("contrasena")(v==="ENCENDER"?"on":"off")}/>
+              <button onClick={()=>setT("contrasena")("nc")}
+                className={`w-full px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${toggles.contrasena==="nc"?"bg-[#4ECDC4] text-white border-[#4ECDC4]":"bg-white text-[#555] border-[#E5E5E0] hover:bg-[#F5F5F0]"}`}>
+                NO CAMBIAR
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+      {footer}
+    </div>
+  );
+}
 
-      {/* Tabs */}
-      <div className="bg-white rounded-xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="border-b border-[#E5E5E0] overflow-x-auto">
-          <div className="flex">
-            {tabs.map((tab, idx) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(idx)}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
-                  activeTab === idx
-                    ? "text-[#4ECDC4] border-[#4ECDC4]"
-                    : "text-[#999999] border-transparent hover:text-[#666666]"
-                }`}
-              >
-                {tab}
+// ─── Tab: Pies de página ──────────────────────────────────────────────────────
+function TabPies({footer}:{footer:React.ReactNode}){
+  const [auto,setAuto]=useState<TVal>("nc");
+  return(
+    <div>
+      <div className="space-y-4 max-w-lg mb-6">
+        <div className="grid grid-cols-[180px_1fr] gap-3 items-center">
+          <label className="text-sm text-[#666]">Pie de página automático</label>
+          <ToggleGroup value={auto} onChange={setAuto}/>
+        </div>
+        {["Primer pie de pagina","Segundo pie de pagina","Tercer pie de pagina","Cuarto pie de pagina"].map(l=>(
+          <div key={l} className="grid grid-cols-[180px_1fr] gap-3 items-center">
+            <label className="text-sm text-[#666]">{l}</label>
+            <input className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+          </div>
+        ))}
+      </div>
+      {footer}
+    </div>
+  );
+}
+
+// ─── Tab: Premios & Comisiones ────────────────────────────────────────────────
+function TabPremios({footer}:{footer:React.ReactNode}){
+  const [sub,setSub]=useState<"Premios"|"Comisiones"|"Comisiones 2">("Premios");
+  return(
+    <div>
+      {/* Sub-tabs */}
+      <div className="flex gap-1 mb-5 border-b border-[#E5E5E0]">
+        {(["Premios","Comisiones","Comisiones 2"] as const).map(s=>(
+          <button key={s} onClick={()=>setSub(s)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${sub===s?"text-[#4ECDC4] border-[#4ECDC4]":"text-[#999] border-transparent hover:text-[#666]"}`}>
+            {s}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        {PRIZE_TYPES.map((p,i)=>(
+          <div key={`${p.t}-${i}`} className="bg-[#F8F8F5] rounded-xl border border-[#E5E5E0] p-3">
+            <p className="text-[11px] font-bold text-[#333] uppercase tracking-wide mb-0.5">{p.t}</p>
+            <p className="text-[10px] text-[#999] mb-2">{p.s}</p>
+            <input className="w-full px-2 py-1 text-xs border border-[#E5E5E0] rounded bg-white focus:outline-none focus:border-[#4ECDC4] mb-1.5"/>
+            {p.f.map((fl,j)=>(
+              <div key={j} className="mb-1.5">
+                {fl&&<label className="text-[10px] text-[#999] block">{fl}</label>}
+                <input className="w-full px-2 py-1 text-xs border border-[#E5E5E0] rounded bg-white focus:outline-none focus:border-[#4ECDC4]"/>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      {footer}
+    </div>
+  );
+}
+
+// ─── Tab: Sorteos ─────────────────────────────────────────────────────────────
+function TabSorteos({footer}:{footer:React.ReactNode}){
+  const [activos,setActivos]=useState<Set<string>>(new Set(SORTEOS.filter(s=>s!=="TODOS")));
+  const [cierre,setCierre]=useState("");
+  const toggle=(s:string)=>{const n=new Set(activos);n.has(s)?n.delete(s):n.add(s);setActivos(n);};
+  return(
+    <div>
+      <div className="space-y-4 mb-6">
+        <div className="grid grid-cols-[160px_1fr] gap-3 items-start">
+          <label className="text-sm text-[#666] pt-1">Sorteos activos</label>
+          <div className="flex flex-wrap gap-1.5">
+            {SORTEOS.filter(s=>s!=="TODOS").map(s=>(
+              <Chip key={s} label={s} active={activos.has(s)} onClick={()=>toggle(s)}/>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-[160px_1fr] gap-3 items-center">
+          <label className="text-sm text-[#666]">Aplicar cierre anticipado a</label>
+          <div className="relative w-56">
+            <select value={cierre} onChange={e=>setCierre(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg appearance-none focus:outline-none focus:border-[#4ECDC4]">
+              <option value="">Seleccione</option>
+              {SORTEOS.filter(s=>s!=="TODOS").map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none"/>
+          </div>
+        </div>
+      </div>
+      {footer}
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+export default function EdicionMasiva(){
+  const [tab,setTab]=useState<Tab>("Configuración");
+  const [selSorteos,setSelSorteos]=useState<Set<string>>(new Set(SORTEOS));
+  const [selBancas,setSelBancas]=useState<Set<string>>(new Set(BANCAS));
+  const [selZonas,setSelZonas]=useState<Set<string>>(new Set(ZONAS));
+  const [updGeneral,setUpdGeneral]=useState(true);
+
+  const footer=(
+    <SharedFooter selSorteos={selSorteos} setSelSorteos={setSelSorteos}
+      selBancas={selBancas} setSelBancas={setSelBancas}
+      selZonas={selZonas} setSelZonas={setSelZonas}
+      updGeneral={updGeneral} setUpdGeneral={setUpdGeneral}/>
+  );
+
+  return(
+    <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.3}} className="space-y-5">
+      <PageHeader title="Actualizar banca"/>
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-6">
+        {/* Tabs */}
+        <div className="border-b border-[#E5E5E0] mb-6">
+          <div className="flex gap-0">
+            {TABS.map(t=>(
+              <button key={t} onClick={()=>setTab(t)}
+                className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${tab===t?"text-[#4ECDC4] border-[#4ECDC4]":"text-[#999] border-transparent hover:text-[#666]"}`}>
+                {t}
               </button>
             ))}
           </div>
         </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25, ease: easeOut }}
-            className="p-5"
-          >
-            {activeTab === 0 && (
-              <div className="space-y-6">
-                <h3 className="text-sm font-semibold text-[#333333]">Parametros de configuracion</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                  {params.map((param, idx) => (
-                    <div key={param.label} className="flex items-center justify-between py-2 border-b border-[#F0F0EB]">
-                      <span className="text-sm text-[#333333]">{param.label}</span>
-                      <button
-                        onClick={() => toggleParam(idx)}
-                        className={`relative inline-flex h-[22px] w-10 items-center rounded-full transition-colors duration-200 ${
-                          param.enabled ? "bg-[#4ECDC4]" : "bg-[#E5E5E0]"
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-[18px] w-[18px] transform rounded-full bg-white shadow transition-transform duration-200 ${
-                            param.enabled ? "translate-x-5" : "translate-x-0.5"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Bank Selection */}
-                <div className="border-t border-[#E5E5E0] pt-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-[#333333]">Bancas a actualizar</h3>
-                    <div className="flex gap-2">
-                      <button onClick={selectAllBanks} className="text-xs text-[#4ECDC4] hover:underline">Seleccionar todas</button>
-                      <button onClick={deselectAllBanks} className="text-xs text-[#999999] hover:underline">Deseleccionar</button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto border border-[#E5E5E0] rounded-lg p-3">
-                    {filteredPools.map((bp) => (
-                      <label
-                        key={bp.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#FAFAF8] cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedBanks.has(bp.id)}
-                          onChange={() => toggleBank(bp.id)}
-                          className="rounded text-[#4ECDC4] focus:ring-[#4ECDC4]"
-                        />
-                        <span className="text-sm text-[#333333] truncate">{bp.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 1 && (
-              <div className="space-y-4 max-w-lg">
-                <h3 className="text-sm font-semibold text-[#333333]">Pies de pagina</h3>
-                {["Pie de pagina ticket", "Pie de pagina web", "Pie de pagina movil", "Mensaje de agradecimiento"].map((label) => (
-                  <div key={label}>
-                    <label className="block text-sm text-[#666666] mb-1">{label}</label>
-                    <textarea
-                      rows={2}
-                      className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] resize-none"
-                      placeholder={`Texto de ${label.toLowerCase()}...`}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {activeTab === 2 && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-[#333333]">Premios & Comisiones</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {["Quiniela", "Pale", "Tripleta", "Super Pale", "Combo"].map((tipo) => (
-                    <div key={tipo} className="bg-[#FAFAF8] rounded-lg p-3 border border-[#E5E5E0]">
-                      <label className="block text-sm font-medium text-[#333333] mb-1">{tipo}</label>
-                      <input type="number" defaultValue={85} className="w-full px-2 py-1.5 border border-[#E5E5E0] rounded text-sm font-mono" />
-                      <span className="text-xs text-[#999999] mt-1 block">Multiplicador</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 3 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-[#333333]">Sorteos disponibles</h3>
-                  <div className="flex gap-2">
-                    <button onClick={selectAllLotteries} className="text-xs text-[#4ECDC4] hover:underline">Seleccionar todos</button>
-                    <button onClick={deselectAllLotteries} className="text-xs text-[#999999] hover:underline">Deseleccionar</button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {lotteries.map((lot) => (
-                    <label
-                      key={lot.id}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E5E5E0] hover:bg-[#FAFAF8] cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedLotteries.has(lot.id)}
-                        onChange={() => toggleLottery(lot.id)}
-                        className="rounded text-[#4ECDC4] focus:ring-[#4ECDC4]"
-                      />
-                      <span className="text-sm text-[#333333] truncate">{lot.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3">
-        <button className="px-5 py-2.5 bg-white border border-[#E5E5E0] text-[#333333] rounded-full text-sm font-medium hover:bg-[#F5F5F0] hover:border-[#4ECDC4] transition-all duration-200">
-          Actualizar valores generales
-        </button>
-        <button className="px-6 py-2.5 bg-[#4ECDC4] text-white rounded-full text-sm font-medium hover:bg-[#3DBDB5] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-[0_2px_8px_rgba(78,205,196,0.3)]">
-          Actualizar
-        </button>
+        {tab==="Configuración"       && <TabConfig footer={footer}/>}
+        {tab==="Pies de página"      && <TabPies footer={footer}/>}
+        {tab==="Premios & Comisiones"&& <TabPremios footer={footer}/>}
+        {tab==="Sorteos"             && <TabSorteos footer={footer}/>}
       </div>
     </motion.div>
   );

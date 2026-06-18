@@ -1,200 +1,312 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Eye, Pencil, Trash2 } from "lucide-react";
-import PageHeader from "@/components/ui/PageHeader";
-import { adminUsers, bettingPools } from "@/data/mockData";
+import { Search, Eye, Pencil, Trash2, Plus, Shield, User, Building2, LayoutGrid, LayoutList } from "lucide-react";
 
-const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
+// ─── Datos locales NMV (sin mockData) ────────────────────────────────────────
 
+interface AdminUser {
+  id: string; username: string; fullName: string; email: string;
+  role: "superadmin"|"admin"|"supervisor"; isActive: boolean; lastLogin: string;
+}
+
+interface BancaUser {
+  id: string; code: string; name: string; owner: string;
+  zone: string; isActive: boolean; lastLogin: string;
+}
+
+const adminUsers: AdminUser[] = [
+  {id:"a1",username:"superadmin",  fullName:"Super Administrador", email:"super@nmvapp.com",    role:"superadmin", isActive:true, lastLogin:"2026-06-17 10:30"},
+  {id:"a2",username:"admin",       fullName:"Administrador NMV",   email:"admin@nmvapp.com",    role:"admin",      isActive:true, lastLogin:"2026-06-17 09:15"},
+  {id:"a3",username:"supervisor1", fullName:"Supervisor Zona 1",   email:"sup1@nmvapp.com",     role:"supervisor", isActive:true, lastLogin:"2026-06-16 18:45"},
+  {id:"a4",username:"supervisor2", fullName:"Supervisor SFM",      email:"sup2@nmvapp.com",     role:"supervisor", isActive:false,lastLogin:"2026-06-10 08:00"},
+];
+
+const bancaUsers: BancaUser[] = [
+  {id:"b01",code:"NMV-0001",name:"NMV RD 01",owner:"Operador 01",zone:"Default",isActive:true, lastLogin:"2026-06-17 11:00"},
+  {id:"b02",code:"NMV-0002",name:"NMV RD 02",owner:"Operador 02",zone:"Default",isActive:true, lastLogin:"2026-06-17 10:50"},
+  {id:"b03",code:"NMV-0003",name:"NMV RD 03",owner:"Operador 03",zone:"Default",isActive:true, lastLogin:"2026-06-17 10:20"},
+  {id:"b04",code:"NMV-0004",name:"NMV RD 04",owner:"Operador 04",zone:"Default",isActive:true, lastLogin:"2026-06-17 09:30"},
+  {id:"b05",code:"NMV-0005",name:"NMV RD 05",owner:"Operador 05",zone:"Default",isActive:true, lastLogin:"2026-06-17 08:45"},
+  {id:"b06",code:"NMV-0006",name:"NMV RD 06",owner:"Operador 06",zone:"Default",isActive:true, lastLogin:"2026-06-16 22:00"},
+  {id:"b07",code:"NMV-0007",name:"NMV RD 07",owner:"Operador 07",zone:"Default",isActive:false,lastLogin:"2026-06-15 14:30"},
+  {id:"b08",code:"NMV-0008",name:"NMV RD 08",owner:"Operador 08",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 10:10"},
+  {id:"b09",code:"NMV-0009",name:"NMV RD 09",owner:"Operador 09",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 09:55"},
+  {id:"b10",code:"NMV-0010",name:"NMV RD 10",owner:"Operador 10",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 09:40"},
+  {id:"b11",code:"NMV-0011",name:"NMV RD 11",owner:"Operador 11",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 08:00"},
+  {id:"b12",code:"NMV-0012",name:"NMV RD 12",owner:"Operador 12",zone:"SFM",    isActive:true, lastLogin:"2026-06-16 20:00"},
+  {id:"b13",code:"NMV-0013",name:"NMV RD 13",owner:"Operador 13",zone:"SFM",    isActive:false,lastLogin:"2026-06-14 10:00"},
+];
+
+const roleConfig = {
+  superadmin: {label:"Super Admin", color:"text-purple-700", bg:"bg-purple-50 border-purple-200"},
+  admin:      {label:"Admin",       color:"text-blue-700",   bg:"bg-blue-50 border-blue-200"},
+  supervisor: {label:"Supervisor",  color:"text-teal-700",   bg:"bg-teal-50 border-teal-200"},
+};
+
+// ─── Action Buttons helper ────────────────────────────────────────────────────
+function ActionBtns({onView,onEdit,onDelete}:{onView:()=>void;onEdit:()=>void;onDelete:()=>void}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button onClick={onView}   className="p-1.5 rounded-lg text-[#666] hover:text-[#14B8A6] hover:bg-[#E0F7F5] transition-colors" title="Ver"><Eye size={14}/></button>
+      <button onClick={onEdit}   className="p-1.5 rounded-lg text-[#666] hover:text-[#6366F1] hover:bg-[#EEF2FF] transition-colors" title="Editar"><Pencil size={14}/></button>
+      <button onClick={onDelete} className="p-1.5 rounded-lg text-[#666] hover:text-[#EF4444] hover:bg-[#FEE2E2] transition-colors" title="Eliminar"><Trash2 size={14}/></button>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ListaUsuarios() {
-  const [activeTab, setActiveTab] = useState<"administradores" | "bancas">("administradores");
+  const [activeTab, setActiveTab] = useState<"administradores"|"bancas">("administradores");
   const [searchAdmin, setSearchAdmin] = useState("");
   const [searchBanca, setSearchBanca] = useState("");
-  const [selectedUser, setSelectedUser] = useState("");
+  const [viewMode, setViewMode] = useState<"list"|"grid">("list");
 
-  const filteredAdmins = useMemo(() => {
-    return adminUsers.filter((u) =>
-      u.username.toLowerCase().includes(searchAdmin.toLowerCase())
-    );
-  }, [searchAdmin]);
+  const filteredAdmins = useMemo(()=>
+    adminUsers.filter(u=>
+      u.username.toLowerCase().includes(searchAdmin.toLowerCase()) ||
+      u.fullName.toLowerCase().includes(searchAdmin.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchAdmin.toLowerCase())
+    ),[searchAdmin]);
 
-  const filteredBancaUsers = useMemo(() => {
-    return bettingPools.filter((bp) =>
-      bp.code.toLowerCase().includes(searchBanca.toLowerCase())
-    );
-  }, [searchBanca]);
+  const filteredBancas = useMemo(()=>
+    bancaUsers.filter(b=>
+      b.code.toLowerCase().includes(searchBanca.toLowerCase()) ||
+      b.name.toLowerCase().includes(searchBanca.toLowerCase()) ||
+      b.owner.toLowerCase().includes(searchBanca.toLowerCase())
+    ),[searchBanca]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: easeOut }}
-      className="space-y-5"
-    >
-      <PageHeader title="Usuarios" subtitle="Gestion de usuarios del sistema" />
-
-      {/* Tabs */}
-      <div className="bg-white rounded-xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="border-b border-[#E5E5E0]">
-          <div className="flex">
-            {(["administradores", "bancas"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-3 text-sm font-medium capitalize transition-colors border-b-2 ${
-                  activeTab === tab
-                    ? "text-[#4ECDC4] border-[#4ECDC4]"
-                    : "text-[#999999] border-transparent hover:text-[#666666]"
-                }`}
-              >
-                {tab === "administradores" ? "Administradores" : "Bancas"}
-              </button>
-            ))}
-          </div>
+    <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.3}} className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#333]">Usuarios</h1>
+          <p className="text-sm text-[#999] mt-0.5">
+            {adminUsers.length} administradores · {bancaUsers.length} operadores de banca
+          </p>
         </div>
+        <button className="flex items-center gap-2 px-4 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-xl hover:bg-[#3DBDB5] shadow-sm transition-colors">
+          <Plus size={15}/> Crear Usuario
+        </button>
+      </div>
 
-        <div className="p-4 border-b border-[#E5E5E0]">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999]" />
-              <input
-                type="text"
-                placeholder={activeTab === "administradores" ? "Buscar administrador..." : "Buscar usuario de banca..."}
-                value={activeTab === "administradores" ? searchAdmin : searchBanca}
-                onChange={(e) =>
-                  activeTab === "administradores"
-                    ? setSearchAdmin(e.target.value)
-                    : setSearchBanca(e.target.value)
-                }
-                className="w-full pl-9 pr-4 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)]"
-              />
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          {label:"Admins Activos",  val:adminUsers.filter(u=>u.isActive).length,    icon:Shield,   color:"text-purple-600", bg:"bg-purple-50"},
+          {label:"Admins Inactivos",val:adminUsers.filter(u=>!u.isActive).length,   icon:Shield,   color:"text-gray-400",   bg:"bg-gray-50"},
+          {label:"Bancas Activas",  val:bancaUsers.filter(b=>b.isActive).length,    icon:Building2,color:"text-teal-600",   bg:"bg-teal-50"},
+          {label:"Bancas Inactivas",val:bancaUsers.filter(b=>!b.isActive).length,   icon:Building2,color:"text-red-400",    bg:"bg-red-50"},
+        ].map(s=>{
+          const Icon=s.icon;
+          return(
+            <div key={s.label} className="bg-white rounded-xl border border-[#E5E5E0] p-4 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center`}>
+                <Icon size={18} className={s.color}/>
+              </div>
+              <div>
+                <p className={`text-xl font-bold ${s.color}`}>{s.val}</p>
+                <p className="text-xs text-[#999]">{s.label}</p>
+              </div>
             </div>
-            <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm bg-white focus:outline-none focus:border-[#4ECDC4]"
-            >
-              <option value="">Usuario</option>
-              {activeTab === "administradores"
-                ? adminUsers.map((u) => (
-                    <option key={u.id} value={u.username}>{u.username}</option>
-                  ))
-                : bettingPools.map((bp) => (
-                    <option key={bp.id} value={bp.code}>{bp.code}</option>
-                  ))}
-            </select>
+          );
+        })}
+      </div>
+
+      {/* Tabs + Controls */}
+      <div className="bg-white rounded-xl border border-[#E5E5E0]">
+        <div className="flex items-center justify-between border-b border-[#F0F0EB] px-4">
+          <div className="flex">
+            {([{key:"administradores",label:"Administradores",icon:User},{key:"bancas",label:"Bancas",icon:Building2}] as const).map(t=>{
+              const Icon=t.icon;
+              return(
+                <button key={t.key} onClick={()=>setActiveTab(t.key)}
+                  className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab===t.key?"text-[#4ECDC4]":"text-[#999] hover:text-[#666]"}`}>
+                  <Icon size={14}/>{t.label}
+                  {activeTab===t.key&&(
+                    <motion.div layoutId="usr-tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4ECDC4]"
+                      transition={{type:"spring",stiffness:400,damping:30}}/>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {/* View toggle */}
+          <div className="flex items-center gap-1 pr-1">
+            <button onClick={()=>setViewMode("list")}
+              className={`p-1.5 rounded-lg transition-colors ${viewMode==="list"?"bg-[#E0F7F5] text-[#14B8A6]":"text-[#999] hover:text-[#666]"}`}
+              title="Vista lista"><LayoutList size={16}/></button>
+            <button onClick={()=>setViewMode("grid")}
+              className={`p-1.5 rounded-lg transition-colors ${viewMode==="grid"?"bg-[#E0F7F5] text-[#14B8A6]":"text-[#999] hover:text-[#666]"}`}
+              title="Vista cuadrícula"><LayoutGrid size={16}/></button>
           </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            {activeTab === "administradores" ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#F8F8F5] text-[#666666] text-[13px] font-semibold uppercase tracking-[0.03em]">
-                      <th className="px-4 py-3 text-left border-b border-[#E8E8E3]">Usuario</th>
-                      <th className="px-4 py-3 text-left border-b border-[#E8E8E3]">Nombre completo</th>
-                      <th className="px-4 py-3 text-left border-b border-[#E8E8E3]">Rol</th>
-                      <th className="px-4 py-3 text-center border-b border-[#E8E8E3]">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAdmins.map((user, idx) => (
-                      <motion.tr
-                        key={user.id}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: idx * 0.05, ease: easeOut }}
-                        className={`border-b border-[#E8E8E3] ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFAF8]"} hover:bg-[#F0F8F7] group`}
-                      >
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-[13px] font-medium text-[#4ECDC4] hover:underline cursor-pointer">
-                            {user.username}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-[#333333]">{user.fullName}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            user.role === "superadmin"
-                              ? "bg-purple-100 text-purple-800"
-                              : user.role === "admin"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-700"
-                          }`}>
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                            <button className="p-1.5 rounded-md hover:bg-[rgba(78,205,196,0.1)] text-[#666666] hover:text-[#4ECDC4] transition-colors">
-                              <Eye size={14} />
-                            </button>
-                            <button className="p-1.5 rounded-md hover:bg-[rgba(78,205,196,0.1)] text-[#666666] hover:text-[#4ECDC4] transition-colors">
-                              <Pencil size={14} />
-                            </button>
-                            <button className="p-1.5 rounded-md hover:bg-red-50 text-[#666666] hover:text-red-500 transition-colors">
-                              <Trash2 size={14} />
-                            </button>
+        <div className="p-4">
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/>
+            <input
+              value={activeTab==="administradores"?searchAdmin:searchBanca}
+              onChange={e=>activeTab==="administradores"?setSearchAdmin(e.target.value):setSearchBanca(e.target.value)}
+              placeholder={activeTab==="administradores"?"Buscar administrador...":"Buscar banca..."}
+              className="w-full sm:w-72 pl-8 pr-4 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {/* ADMINISTRADORES */}
+            {activeTab==="administradores"&&(
+              <motion.div key="admins" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}>
+                {viewMode==="list"?(
+                  /* List view */
+                  <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+                    <table className="w-full text-sm">
+                      <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+                        {["Usuario","Nombre completo","Email","Rol","Estado","Último acceso","Acciones"].map(h=>(
+                          <th key={h} className="px-3 py-3 text-xs font-semibold text-[#555] text-left">{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {filteredAdmins.length===0?(
+                          <tr><td colSpan={7} className="py-10 text-center text-sm text-[#999]">No se encontraron administradores</td></tr>
+                        ):filteredAdmins.map((u,ri)=>{
+                          const rc=roleConfig[u.role];
+                          return(
+                            <tr key={u.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/20 transition-colors`}>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-[#E0F7F5] flex items-center justify-center text-[#14B8A6] font-bold text-xs">
+                                    {u.username.slice(0,2).toUpperCase()}
+                                  </div>
+                                  <span className="font-medium text-[#333]">{u.username}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5 text-[#444]">{u.fullName}</td>
+                              <td className="px-3 py-2.5 text-[#666] text-xs">{u.email}</td>
+                              <td className="px-3 py-2.5">
+                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${rc.bg} ${rc.color}`}>{rc.label}</span>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${u.isActive?"bg-[#F0FDF4] text-[#16A34A]":"bg-[#F9FAFB] text-[#999]"}`}>
+                                  {u.isActive?"Activo":"Inactivo"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-xs text-[#999]">{u.lastLogin}</td>
+                              <td className="px-3 py-2.5">
+                                <ActionBtns onView={()=>{}} onEdit={()=>{}} onDelete={()=>{}}/>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ):(
+                  /* Grid view */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredAdmins.map(u=>{
+                      const rc=roleConfig[u.role];
+                      return(
+                        <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E0] p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-10 h-10 rounded-xl bg-[#E0F7F5] flex items-center justify-center text-[#14B8A6] font-bold">
+                                {u.username.slice(0,2).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-[#333] text-sm">{u.username}</p>
+                                <p className="text-xs text-[#999]">{u.fullName}</p>
+                              </div>
+                            </div>
+                            <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${rc.bg} ${rc.color}`}>{rc.label}</span>
                           </div>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#F8F8F5] text-[#666666] text-[13px] font-semibold uppercase tracking-[0.03em]">
-                      <th className="px-4 py-3 text-left border-b border-[#E8E8E3]">Usuario</th>
-                      <th className="px-4 py-3 text-left border-b border-[#E8E8E3]">Banca</th>
-                      <th className="px-4 py-3 text-center border-b border-[#E8E8E3]">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBancaUsers.map((bp, idx) => (
-                      <motion.tr
-                        key={bp.id}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: idx * 0.03, ease: easeOut }}
-                        className={`border-b border-[#E8E8E3] ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFAF8]"} hover:bg-[#F0F8F7] group`}
-                      >
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-[13px] font-medium text-[#4ECDC4] hover:underline cursor-pointer">
-                            {bp.code}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-[#333333]">{bp.name}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                            <button className="p-1.5 rounded-md hover:bg-[rgba(78,205,196,0.1)] text-[#666666] hover:text-[#4ECDC4] transition-colors">
-                              <Eye size={14} />
-                            </button>
-                            <button className="p-1.5 rounded-md hover:bg-[rgba(78,205,196,0.1)] text-[#666666] hover:text-[#4ECDC4] transition-colors">
-                              <Pencil size={14} />
-                            </button>
-                            <button className="p-1.5 rounded-md hover:bg-red-50 text-[#666666] hover:text-red-500 transition-colors">
-                              <Trash2 size={14} />
-                            </button>
+                          <p className="text-xs text-[#666] mb-3 truncate">{u.email}</p>
+                          <div className="flex items-center justify-between">
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${u.isActive?"bg-[#F0FDF4] text-[#16A34A]":"bg-[#F9FAFB] text-[#999]"}`}>
+                              {u.isActive?"Activo":"Inactivo"}
+                            </span>
+                            <ActionBtns onView={()=>{}} onEdit={()=>{}} onDelete={()=>{}}/>
                           </div>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
             )}
-          </motion.div>
-        </AnimatePresence>
+
+            {/* BANCAS */}
+            {activeTab==="bancas"&&(
+              <motion.div key="bancas" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}>
+                {viewMode==="list"?(
+                  /* List view */
+                  <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+                    <table className="w-full text-sm">
+                      <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+                        {["Código","Nombre","Propietario","Zona","Estado","Último acceso","Acciones"].map(h=>(
+                          <th key={h} className="px-3 py-3 text-xs font-semibold text-[#555] text-left">{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {filteredBancas.length===0?(
+                          <tr><td colSpan={7} className="py-10 text-center text-sm text-[#999]">No se encontraron bancas</td></tr>
+                        ):filteredBancas.map((b,ri)=>(
+                          <tr key={b.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/20 transition-colors`}>
+                            <td className="px-3 py-2.5">
+                              <span className="px-2 py-0.5 text-xs font-bold font-mono rounded-lg bg-[#F5F5F0] text-[#555]">{b.code}</span>
+                            </td>
+                            <td className="px-3 py-2.5 font-medium text-[#333]">{b.name}</td>
+                            <td className="px-3 py-2.5 text-[#666]">{b.owner}</td>
+                            <td className="px-3 py-2.5">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-[#E0F7F5] text-[#14B8A6]">{b.zone}</span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${b.isActive?"bg-[#F0FDF4] text-[#16A34A]":"bg-[#F9FAFB] text-[#999]"}`}>
+                                {b.isActive?"Activa":"Inactiva"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs text-[#999]">{b.lastLogin}</td>
+                            <td className="px-3 py-2.5">
+                              <ActionBtns onView={()=>{}} onEdit={()=>{}} onDelete={()=>{}}/>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ):(
+                  /* Grid view */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredBancas.map(b=>(
+                      <div key={b.id} className="bg-white rounded-xl border border-[#E5E5E0] p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-9 h-9 rounded-lg bg-[#E0F7F5] flex items-center justify-center">
+                              <Building2 size={16} className="text-[#14B8A6]"/>
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm font-mono text-[#333]">{b.code}</p>
+                              <p className="text-xs text-[#999]">{b.name}</p>
+                            </div>
+                          </div>
+                          <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${b.isActive?"bg-[#F0FDF4] text-[#16A34A]":"bg-[#F9FAFB] text-[#999]"}`}>
+                            {b.isActive?"Activa":"Inactiva"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#666] mb-1">{b.owner}</p>
+                        <p className="text-xs text-[#999] mb-3">Zona: <span className="text-[#14B8A6] font-medium">{b.zone}</span></p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-[#bbb]">{b.lastLogin}</p>
+                          <ActionBtns onView={()=>{}} onEdit={()=>{}} onDelete={()=>{}}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </motion.div>
   );

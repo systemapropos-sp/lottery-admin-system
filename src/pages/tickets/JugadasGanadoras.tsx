@@ -1,128 +1,143 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Calendar, FileText, Filter } from "lucide-react";
-import DataTable from "@/components/ui/DataTable";
+import { RefreshCw, ChevronDown, FileText } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { lotteries } from "@/data/mockData";
 
-interface WinnerRow {
-  id: string;
-  tipoJugada: string;
-  jugada: string;
-  venta: number;
-  premio: number;
-  total: number;
+function fmt(n:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(n);}
+function today(){return new Date().toISOString().split("T")[0];}
+
+const SORTEOS_LIST=["GANA MAS","LA PRIMERA","NEW YORK AM","FLORIDA AM","QUINIELA REAL","ANGUILA 10AM","LOTEKA","LA SUERTE","LOTEDOM"];
+const ZONAS_LIST=["Default","SFM"];
+
+// Mock grouped data: { sorteo, tipos: [{tipo, jugadas:[{num,venta,premio}]}] }
+const MOCK_RESULTS=[{
+  sorteo:"GANA MAS",
+  tipos:[
+    {tipo:"Directo",jugadas:[
+      {num:"15",venta:1175,premio:4700},{num:"21",venta:875,premio:7550},
+      {num:"18",venta:525,premio:2100},{num:"54",venta:400,premio:32000},
+      {num:"44",venta:275,premio:22000},{num:"50",venta:175,premio:1400},
+      {num:"61",venta:155,premio:1200},{num:"62",venta:50,premio:200},
+      {num:"97",venta:25,premio:2000},
+    ]},
+    {tipo:"Pale",jugadas:[{num:"18-61",venta:10,premio:1000}]},
+  ],
+}];
+
+function MultiSelect({label,options,value,onChange}:{label:string;options:string[];value:string[];onChange:(v:string[])=>void}){
+  const [open,setOpen]=useState(false);
+  const toggle=(o:string)=>onChange(value.includes(o)?value.filter(x=>x!==o):[...value,o]);
+  const txt=value.length===0||value.length===options.length?`${options.length} seleccionadas`:`${value.length} seleccionadas`;
+  return(
+    <div className="relative">
+      <label className="text-xs text-[#999] font-medium block mb-1">{label}</label>
+      <button onClick={()=>setOpen(v=>!v)} className="flex items-center gap-2 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg bg-white min-w-[160px] hover:border-[#4ECDC4]">
+        <span className="flex-1 text-left text-[#555]">{txt}</span>
+        <ChevronDown size={13} className={`text-[#999] transition-transform ${open?"rotate-180":""}`}/>
+      </button>
+      {open&&<div className="absolute z-30 top-full mt-1 bg-white border border-[#E5E5E0] rounded-xl shadow-lg p-2 max-h-[220px] overflow-y-auto min-w-[180px]">
+        {options.map(o=><label key={o} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm">
+          <input type="checkbox" checked={value.includes(o)} onChange={()=>toggle(o)} className="accent-[#4ECDC4]"/>{o}
+        </label>)}
+      </div>}
+    </div>
+  );
 }
 
-function generateWinners(): WinnerRow[] {
-  const playTypes = ["Quiniela", "Pale", "Tripleta", "Super Pale"];
-  const rows: WinnerRow[] = [];
-  for (let i = 0; i < 25; i++) {
-    const venta = Math.random() * 2000 + 50;
-    const premio = venta * (Math.random() * 50 + 20);
-    rows.push({
-      id: `win-${i}`,
-      tipoJugada: playTypes[i % playTypes.length],
-      jugada: `${String(Math.floor(Math.random() * 99)).padStart(2, "0")}-${String(Math.floor(Math.random() * 99)).padStart(2, "0")}`,
-      venta,
-      premio,
-      total: premio,
-    });
-  }
-  return rows;
-}
+export default function JugadasGanadoras(){
+  const [fi,setFi]=useState(()=>{const d=new Date();d.setDate(d.getDate()-3);return d.toISOString().split("T")[0];});
+  const [ff,setFf]=useState(today());
+  const [sorteo,setSorteo]=useState("GANA MAS");
+  const [selZonas,setSelZonas]=useState<string[]>([]);
 
-export default function JugadasGanadoras() {
-  const [startDate, setStartDate] = useState("2024-05-01");
-  const [endDate, setEndDate] = useState("2024-05-15");
-  const [selectedSorteo, setSelectedSorteo] = useState("");
-  const [selectedZone, setSelectedZone] = useState("");
-  const [data] = useState<WinnerRow[]>(generateWinners);
+  const filtered=useMemo(()=>MOCK_RESULTS.filter(r=>r.sorteo===sorteo),[sorteo]);
 
-  const columns = [
-    { key: "tipoJugada", header: "Tipo de jugada", accessor: (r: WinnerRow) => r.tipoJugada, sortable: true },
-    { key: "jugada", header: "Jugada", accessor: (r: WinnerRow) => r.jugada, sortable: true, align: "center" as const, cell: (r: WinnerRow) => <span className="font-mono font-semibold text-[#333333]">{r.jugada}</span> },
-    {
-      key: "venta", header: "Venta", accessor: (r: WinnerRow) => r.venta, sortable: true, align: "right" as const,
-      formatter: (_v: unknown, r: WinnerRow) => `$${r.venta.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "premio", header: "Premio", accessor: (r: WinnerRow) => r.premio, sortable: true, align: "right" as const,
-      cell: (r: WinnerRow) => <span className="text-green-600 font-mono font-semibold">${r.premio.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>,
-    },
-    {
-      key: "total", header: "Total", accessor: (r: WinnerRow) => r.total, sortable: true, align: "right" as const,
-      formatter: (_v: unknown, r: WinnerRow) => `$${r.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-  ];
-
-  const totals = data.reduce((acc, r) => ({ venta: acc.venta + r.venta, premio: acc.premio + r.premio, total: acc.total + r.total }), { venta: 0, premio: 0, total: 0 });
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
-      <PageHeader title="Jugadas Ganadoras" subtitle="Listado de jugadas ganadoras" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-4"
-      >
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1.5 min-w-[140px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider flex items-center gap-1"><Calendar size={12} /> Desde</label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors" />
-          </div>
-          <div className="flex flex-col gap-1.5 min-w-[140px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider flex items-center gap-1"><Calendar size={12} /> Hasta</label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors" />
-          </div>
-          <div className="flex flex-col gap-1.5 min-w-[160px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Sorteo</label>
-            <select value={selectedSorteo} onChange={(e) => setSelectedSorteo(e.target.value)}
-              className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors">
-              <option value="">Todos</option>
-              {lotteries.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
+  return(
+    <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.3}} className="space-y-5">
+      <PageHeader title="Jugadas ganadoras"/>
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4 flex flex-wrap items-end gap-3">
+        <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha inicial</label>
+          <input type="date" value={fi} onChange={e=>setFi(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
+        <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha final</label>
+          <input type="date" value={ff} onChange={e=>setFf(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
+        <div>
+          <label className="text-xs text-[#999] font-medium block mb-1">Sorteo</label>
+          <div className="relative">
+            <select value={sorteo} onChange={e=>setSorteo(e.target.value)}
+              className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg appearance-none focus:outline-none focus:border-[#4ECDC4] pr-8">
+              {SORTEOS_LIST.map(s=><option key={s} value={s}>{s}</option>)}
             </select>
-          </div>
-          <div className="flex flex-col gap-1.5 min-w-[140px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Zonas</label>
-            <select value={selectedZone} onChange={(e) => setSelectedZone(e.target.value)}
-              className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors">
-              <option value="">Todas</option>
-              <option value="Default">Default</option>
-              <option value="SFM">SFM</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            <button className="px-4 py-2.5 text-sm font-medium text-white bg-[#4ECDC4] rounded-full hover:bg-[#3DBDB5] hover:shadow-[0_2px_8px_rgba(78,205,196,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2">
-              <Filter size={16} /> Filtrar
-            </button>
-            <button className="p-2.5 text-sm font-medium text-[#666666] bg-white border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F0] hover:border-[#4ECDC4] transition-colors" title="PDF">
-              <FileText size={16} />
-            </button>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none"/>
           </div>
         </div>
-      </motion.div>
+        <MultiSelect label="Zonas" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas}/>
+        <button className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] shadow-sm">
+          <RefreshCw size={13}/> FILTRAR
+        </button>
+        <button className="flex items-center gap-2 px-4 py-2 bg-[#EF4444] text-white text-sm font-semibold rounded-full hover:bg-[#DC2626] shadow-sm">
+          <FileText size={13}/> PDF
+        </button>
+      </div>
 
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-      >
-        <DataTable
-          columns={columns}
-          data={data}
-          keyExtractor={(r) => r.id}
-          pageSize={10}
-          summaryRow={
-            <tr className="bg-[#F0F0EB] font-semibold text-[#333333]">
-              <td colSpan={2} className="px-4 py-3 text-right text-sm">TOTALES</td>
-              <td className="px-4 py-3 text-right text-sm font-mono">${totals.venta.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-              <td className="px-4 py-3 text-right text-sm font-mono text-green-600">${totals.premio.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-              <td className="px-4 py-3 text-right text-sm font-mono">${totals.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-            </tr>
-          }
-        />
-      </motion.div>
+      {/* Results tables */}
+      {filtered.map(result=>{
+        const totalVenta=result.tipos.reduce((s,t)=>s+t.jugadas.reduce((ss,j)=>ss+j.venta,0),0);
+        const totalPremio=result.tipos.reduce((s,t)=>s+t.jugadas.reduce((ss,j)=>ss+j.premio,0),0);
+        return(
+          <div key={result.sorteo} className="bg-white rounded-xl border border-[#E5E5E0] overflow-hidden shadow-sm">
+            {/* Sorteo header */}
+            <div className="bg-[#F0F7F5] border-b border-[#E5E5E0] px-5 py-3 text-center">
+              <span className="text-base font-bold text-[#333] uppercase tracking-wide">{result.sorteo}</span>
+            </div>
+            <table className="w-full text-sm">
+              <thead><tr className="bg-[#F8F8F5] border-b border-[#E5E5E0]">
+                <th className="px-4 py-3 text-xs font-semibold text-[#555] text-left w-[140px]">Tipo de jugada</th>
+                <th className="px-4 py-3 text-xs font-semibold text-[#555] text-left">Jugada</th>
+                <th className="px-4 py-3 text-xs font-semibold text-[#555] text-right">Venta</th>
+                <th className="px-4 py-3 text-xs font-semibold text-[#555] text-right">Premio</th>
+                <th className="px-4 py-3 text-xs font-semibold text-[#555] text-right w-[110px]">Total</th>
+              </tr></thead>
+              <tbody>
+                {result.tipos.map(tipo=>{
+                  const subtot=tipo.jugadas.reduce((s,j)=>s+j.premio,0);
+                  return tipo.jugadas.map((j,ji)=>(
+                    <tr key={`${tipo.tipo}-${ji}`} className={`border-b border-[#F0F0EB] ${ji%2===0?"bg-white":"bg-[#FAFAFA]"}`}>
+                      {ji===0&&(
+                        <td rowSpan={tipo.jugadas.length} className="px-4 py-3 font-bold text-[#333] align-top border-r border-[#F0F0EB]">
+                          {tipo.tipo}
+                        </td>
+                      )}
+                      <td className="px-4 py-2.5 font-mono text-[#4ECDC4] font-semibold">{j.num}</td>
+                      <td className="px-4 py-2.5 text-right text-[#555]">{fmt(j.venta)}</td>
+                      <td className="px-4 py-2.5 text-right text-[#333]">{fmt(j.premio)}</td>
+                      {ji===0&&(
+                        <td rowSpan={tipo.jugadas.length} className="px-4 py-2.5 text-right font-bold text-sky-700 align-middle">
+                          {fmt(subtot)}
+                        </td>
+                      )}
+                    </tr>
+                  ));
+                })}
+                {/* Total row */}
+                <tr className="bg-[#F0F7F5] font-bold border-t-2 border-[#4ECDC4]">
+                  <td className="px-4 py-3 text-[#333]">Total</td>
+                  <td className="px-4 py-3"/>
+                  <td className="px-4 py-3 text-right">{fmt(totalVenta)}</td>
+                  <td className="px-4 py-3 text-right">{fmt(totalPremio)}</td>
+                  <td className="px-4 py-3"/>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+
+      {filtered.length===0&&(
+        <div className="bg-white rounded-xl border border-[#E5E5E0] p-12 text-center text-[#999] text-sm">
+          No hay jugadas ganadoras para este sorteo en el período seleccionado
+        </div>
+      )}
     </motion.div>
   );
 }

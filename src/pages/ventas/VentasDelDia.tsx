@@ -1,330 +1,612 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { FileText, Download, Ticket, TrendingUp } from "lucide-react";
-import DataTable from "@/components/ui/DataTable";
-import PageHeader from "@/components/ui/PageHeader";
-import { bettingPools } from "@/data/mockData";
+import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { RefreshCw, ChevronDown, Search, X } from "lucide-react";
 
-const tabs = [
-  "General",
-  "Banca por sorteo",
-  "Por sorteo",
-  "Combinaciones",
-  "Por zona",
-  "Categoria de Premios",
-  "Categoria de Premios para Pale",
+// ─── Tipos compartidos ────────────────────────────────────────────────────────
+const fmt = (n: number) =>
+  `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+// ─── Datos estáticos (reemplazar con Supabase) ────────────────────────────────
+const BANCAS = [
+  { id: "b1", ref: "MATADOR-SPORT", codigo: "MWR-0001" },
+  { id: "b2", ref: "MMW RD 02",     codigo: "MWR-0002" },
+  { id: "b3", ref: "MMW RD 03",     codigo: "MWR-0003" },
+  { id: "b4", ref: "MMW RD 04",     codigo: "MWR-0004" },
+  { id: "b5", ref: "MMW RD 05",     codigo: "MWR-0005" },
+  { id: "b6", ref: "MMW RD 06",     codigo: "MWR-0006" },
+  { id: "b7", ref: "MMW RD 07",     codigo: "MWR-0007" },
+  { id: "b8", ref: "MMW RD 08",     codigo: "MWR-0008" },
+  { id: "b9", ref: "MMW RD 09",     codigo: "MWR-0009" },
+  { id: "b10", ref: "MMW RD 10",    codigo: "MWR-0010" },
+  { id: "b11", ref: "MMW RD 11",    codigo: "MWR-0011" },
+  { id: "b12", ref: "MMW RD 12",    codigo: "MWR-0012" },
+  { id: "b13", ref: "MMW RD 13",    codigo: "MWR-0013" },
 ];
 
-const quickFilters = [
-  "Todos",
-  "Con ventas",
-  "Con premios",
-  "Con tickets pendientes",
-  "Con ventas netas negativas",
-  "Con ventas netas positivas",
+const ZONAS = [
+  { id: "z1", nombre: "Default" },
+  { id: "z2", nombre: "SFM" },
 ];
 
-interface SalesRow {
-  id: string;
-  ref: string;
-  codigo: string;
-  p: number;
-  l: number;
-  w: number;
-  total: number;
-  venta: number;
-  comisiones: number;
-  premios: number;
-  neto: number;
-  final: number;
-  balance: number;
+const SORTEOS = [
+  "LA PRIMERA 7PM","FLORIDA PM","LOTEKA","LA SUERTE","LA PRIMERA",
+  "GANA MAS","QUINIELA REAL","SUPER PALE REAL-GANA MAS","Anguila 10AM",
+  "NEW YORK AM","Anguila 6PM","SUPER PALE NACIONAL-QP","NACIONAL",
+  "NEW YORK PM","Anguila 9PM","Anguila 1PM","LA SUERTE 6:00pm",
+  "QUINIELA PALE","FLORIDA AM","LOTEDOM","REAL","LOTO POOL",
+  "MEGA CHANCES","SUPER PALE PALE",
+];
+
+// ─── Tipos de fila general ────────────────────────────────────────────────────
+interface GeneralRow {
+  id: string; ref: string; codigo: string;
+  p: number; l: number; w: number; total: number;
+  venta: number; comisiones: number; premios: number;
+  neto: number; final: number; balance: number;
 }
 
-function generateSalesData(): SalesRow[] {
-  return bettingPools.map((bp, i) => {
-    const venta = bp.hasSalesToday ? Math.random() * 50000 + 5000 : 0;
-    const comisiones = venta * 0.15;
-    const premios = bp.hasSalesToday ? Math.random() * 30000 : 0;
-    const neto = venta - comisiones - premios;
-    return {
-      id: bp.id,
-      ref: `${i + 1}`,
-      codigo: bp.mwrCode,
-      p: bp.hasSalesToday ? Math.floor(Math.random() * 10) : 0,
-      l: bp.hasSalesToday ? Math.floor(Math.random() * 15) : 0,
-      w: bp.hasSalesToday ? Math.floor(Math.random() * 8) : 0,
-      total: venta,
-      venta,
-      comisiones,
-      premios,
-      neto,
-      final: neto + bp.balance,
-      balance: bp.balance,
-    };
-  });
+const generalRows: GeneralRow[] = BANCAS.map((b) => ({
+  id: b.id, ref: b.ref, codigo: b.codigo,
+  p: 0, l: 0, w: 0, total: 0,
+  venta: 0, comisiones: 0, premios: 0,
+  neto: 0, final: 0, balance: 0,
+}));
+
+// ─── Pills de filtro ──────────────────────────────────────────────────────────
+type FilterPill = "TODOS" | "CON VENTAS" | "CON PREMIOS" | "CON TICKETS PENDIENTES" | "CON VENTAS NETAS NEGATIVAS" | "CON VENTAS NETAS POSITIVAS";
+const PILLS: FilterPill[] = ["TODOS", "CON VENTAS", "CON PREMIOS", "CON TICKETS PENDIENTES", "CON VENTAS NETAS NEGATIVAS", "CON VENTAS NETAS POSITIVAS"];
+
+function applyPill(rows: GeneralRow[], pill: FilterPill): GeneralRow[] {
+  switch (pill) {
+    case "CON VENTAS":                return rows.filter((r) => r.venta > 0);
+    case "CON PREMIOS":               return rows.filter((r) => r.premios > 0);
+    case "CON TICKETS PENDIENTES":    return rows.filter((r) => r.total > 0);
+    case "CON VENTAS NETAS NEGATIVAS":return rows.filter((r) => r.neto < 0);
+    case "CON VENTAS NETAS POSITIVAS":return rows.filter((r) => r.neto > 0);
+    default:                          return rows;
+  }
 }
 
-const containerVariants = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" as const } },
-};
+// ─── Helpers UI ───────────────────────────────────────────────────────────────
+const netoCell = (n: number) => (
+  <span className={`font-semibold ${n < 0 ? "text-[#EF4444]" : n > 0 ? "text-[#22C55E]" : "text-[#999]"}`}>{fmt(n)}</span>
+);
+const balanceCell = (n: number) => (
+  <span className={`font-semibold ${n > 0 ? "text-[#3B82F6]" : "text-[#999]"}`}>{fmt(n)}</span>
+);
 
-export default function VentasDelDia() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [activeFilter, setActiveFilter] = useState("Todos");
-  const [selectedDate, setSelectedDate] = useState("2024-05-15");
-  const [selectedZones, setSelectedZones] = useState<string[]>([]);
-  const [data, setData] = useState<SalesRow[]>(generateSalesData);
-
-  const zones = ["Default", "SFM"];
-
-  const filteredData = data.filter((row) => {
-    if (activeFilter === "Con ventas") return row.venta > 0;
-    if (activeFilter === "Con premios") return row.premios > 0;
-    if (activeFilter === "Con tickets pendientes") return row.p > 0;
-    if (activeFilter === "Con ventas netas negativas") return row.neto < 0;
-    if (activeFilter === "Con ventas netas positivas") return row.neto > 0;
-    return true;
-  });
-
-  const totals = filteredData.reduce(
-    (acc, row) => ({
-      total: acc.total + row.total,
-      venta: acc.venta + row.venta,
-      comisiones: acc.comisiones + row.comisiones,
-      premios: acc.premios + row.premios,
-      neto: acc.neto + row.neto,
-      final: acc.final + row.final,
-    }),
-    { total: 0, venta: 0, comisiones: 0, premios: 0, neto: 0, final: 0 }
+function TotalBadge({ label, amount }: { label: string; amount: number }) {
+  const neg = amount < 0;
+  return (
+    <div className="flex items-center justify-center gap-2 py-3">
+      <span className="text-lg font-semibold text-[#333]">{label}:</span>
+      <span className={`text-lg font-bold px-4 py-1 rounded-full border-2 ${neg ? "text-[#EF4444] border-[#EF4444] bg-[#FEF2F2]" : "text-[#22C55E] border-[#22C55E] bg-[#F0FDF4]"}`}>
+        {fmt(amount)}
+      </span>
+    </div>
   );
+}
 
-  const columns = [
-    { key: "ref", header: "Ref.", accessor: (r: SalesRow) => r.ref, sortable: true },
-    { key: "codigo", header: "Codigo", accessor: (r: SalesRow) => r.codigo, sortable: true },
-    { key: "p", header: "P", accessor: (r: SalesRow) => r.p, sortable: true, align: "center" as const },
-    { key: "l", header: "L", accessor: (r: SalesRow) => r.l, sortable: true, align: "center" as const },
-    { key: "w", header: "W", accessor: (r: SalesRow) => r.w, sortable: true, align: "center" as const },
-    {
-      key: "total",
-      header: "Total",
-      accessor: (r: SalesRow) => r.total,
-      sortable: true,
-      align: "right" as const,
-      formatter: (_v: unknown, r: SalesRow) => `$${r.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "venta",
-      header: "Venta",
-      accessor: (r: SalesRow) => r.venta,
-      sortable: true,
-      align: "right" as const,
-      formatter: (_v: unknown, r: SalesRow) => `$${r.venta.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "comisiones",
-      header: "Comisiones",
-      accessor: (r: SalesRow) => r.comisiones,
-      sortable: true,
-      align: "right" as const,
-      formatter: (_v: unknown, r: SalesRow) => `$${r.comisiones.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "premios",
-      header: "Premios",
-      accessor: (r: SalesRow) => r.premios,
-      sortable: true,
-      align: "right" as const,
-      formatter: (_v: unknown, r: SalesRow) => `$${r.premios.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "neto",
-      header: "Neto",
-      accessor: (r: SalesRow) => r.neto,
-      sortable: true,
-      align: "right" as const,
-      cell: (r: SalesRow) => (
-        <span className={r.neto >= 0 ? "text-green-600" : "text-red-500"}>
-          ${r.neto.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-        </span>
-      ),
-    },
-    {
-      key: "final",
-      header: "Final",
-      accessor: (r: SalesRow) => r.final,
-      sortable: true,
-      align: "right" as const,
-      formatter: (_v: unknown, r: SalesRow) => `$${r.final.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "balance",
-      header: "Balance",
-      accessor: (r: SalesRow) => r.balance,
-      sortable: true,
-      align: "right" as const,
-      formatter: (_v: unknown, r: SalesRow) => `$${r.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-  ];
+function DateInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs text-[#999]">{label}</label>
+      <input type="date" value={value} onChange={(e) => onChange(e.target.value)}
+        className="px-3 py-1.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#14B8A6] transition-colors" />
+    </div>
+  );
+}
 
-  const handleView = () => setData(generateSalesData());
+function ActionBtn({ label, variant = "primary", onClick }: { label: string; variant?: "primary" | "secondary" | "ghost"; onClick?: () => void }) {
+  const cls = variant === "primary" ? "bg-[#14B8A6] text-white hover:bg-[#0F766E] shadow-sm"
+    : variant === "secondary" ? "bg-white text-[#333] border border-[#E5E5E0] hover:bg-[#F5F5F0] hover:border-[#14B8A6]"
+    : "bg-[#F5F5F0] text-[#666] hover:bg-[#EBEBEB]";
+  return (
+    <button onClick={onClick} className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all active:scale-[0.97] ${cls}`}>
+      {label}
+    </button>
+  );
+}
+
+// ─── MultiSelect dropdown con opciones reales ─────────────────────────────────
+function MultiSelect({ label, options, selected, onChange }: {
+  label: string; options: string[]; selected: string[]; onChange: (s: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggleAll = () => onChange(selected.length === options.length ? [] : [...options]);
+  const toggleOne = (o: string) => onChange(selected.includes(o) ? selected.filter((x) => x !== o) : [...selected, o]);
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="visible">
-      <PageHeader title="Ventas del dia" subtitle={`Resumen de ventas para ${selectedDate}`} />
-
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.05 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-4"
-      >
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1.5 min-w-[160px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Fecha</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5 min-w-[180px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Zonas</label>
-            <select
-              multiple
-              value={selectedZones}
-              onChange={(e) => {
-                const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
-                setSelectedZones(opts);
-              }}
-              className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors"
-              size={1}
-            >
-              <option value="">Todas las zonas</option>
-              {zones.map((z) => (
-                <option key={z} value={z}>
-                  {z}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleView}
-              className="px-5 py-2.5 text-sm font-medium text-white bg-[#4ECDC4] rounded-full hover:bg-[#3DBDB5] hover:shadow-[0_2px_8px_rgba(78,205,196,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
-            >
-              <TrendingUp size={16} />
-              Ver ventas
-            </button>
-            <button className="p-2.5 text-sm font-medium text-[#666666] bg-white border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F0] hover:border-[#4ECDC4] transition-colors" title="PDF">
-              <FileText size={16} />
-            </button>
-            <button className="p-2.5 text-sm font-medium text-[#666666] bg-white border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F0] hover:border-[#4ECDC4] transition-colors" title="CSV">
-              <Download size={16} />
-            </button>
-            <button className="px-4 py-2.5 text-sm font-medium text-[#666666] bg-white border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F0] hover:border-[#4ECDC4] transition-colors flex items-center gap-2">
-              <Ticket size={16} />
-              Procesar tickets
-            </button>
-            <button className="px-4 py-2.5 text-sm font-medium text-[#666666] bg-white border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F0] hover:border-[#4ECDC4] transition-colors">
-              Procesar ventas
+    <div className="flex flex-col gap-1 relative">
+      <label className="text-xs text-[#999]">{label}</label>
+      <div onClick={() => setOpen((p) => !p)}
+        className="flex items-center gap-2 px-3 py-1.5 border border-[#E5E5E0] rounded-lg bg-white cursor-pointer hover:border-[#14B8A6] transition-colors min-w-[150px]">
+        <span className="text-sm text-[#333] flex-1">
+          {selected.length === 0 ? "Ninguna" : selected.length === options.length ? "Todas" : `${selected.length} seleccionadas`}
+        </span>
+        <ChevronDown size={14} className={`text-[#999] transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute top-full left-0 z-50 mt-1 bg-white border border-[#E5E5E0] rounded-xl shadow-xl min-w-[180px] py-2 max-h-60 overflow-y-auto">
+          <div className="px-3 py-1.5 border-b border-[#F0F0EB]">
+            <button onClick={toggleAll} className="text-xs font-semibold text-[#14B8A6] hover:underline">
+              {selected.length === options.length ? "Deseleccionar todo" : "Seleccionar todo"}
             </button>
           </div>
-        </div>
-      </motion.div>
-
-      {/* Quick Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-        className="flex flex-wrap gap-2 mb-4"
-      >
-        {quickFilters.map((filter) => (
-          <button
-            key={filter}
-            onClick={() => setActiveFilter(filter)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-              activeFilter === filter
-                ? "bg-[#4ECDC4] text-white shadow-[0_2px_8px_rgba(78,205,196,0.3)]"
-                : "bg-white text-[#666666] border border-[#E5E5E0] hover:border-[#4ECDC4] hover:text-[#333333]"
-            }`}
-          >
-            {filter}
-          </button>
-        ))}
-      </motion.div>
-
-      {/* Tabs */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.15 }}
-        className="border-b border-[#E5E5E0] mb-4"
-      >
-        <div className="flex flex-wrap gap-0">
-          {tabs.map((tab, i) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(i)}
-              className={`px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 whitespace-nowrap ${
-                activeTab === i
-                  ? "text-[#4ECDC4] border-[#4ECDC4]"
-                  : "text-[#999999] border-transparent hover:text-[#666666]"
-              }`}
-            >
-              {tab}
-            </button>
+          {options.map((o) => (
+            <label key={o} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#F5F5F0] cursor-pointer text-sm text-[#333]">
+              <input type="checkbox" checked={selected.includes(o)} onChange={() => toggleOne(o)}
+                className="rounded accent-[#14B8A6]" />
+              {o}
+            </label>
           ))}
         </div>
-      </motion.div>
+      )}
+    </div>
+  );
+}
 
-      {/* Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-      >
-        <DataTable
-          columns={columns}
-          data={filteredData}
-          keyExtractor={(r) => r.id}
-          pageSize={10}
-          summaryRow={
-            <tr className="bg-[#F0F0EB] font-semibold text-[#333333]">
-              <td colSpan={5} className="px-4 py-3 text-right text-sm">
-                TOTALES
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-mono">
-                ${totals.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-mono">
-                ${totals.venta.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-mono">
-                ${totals.comisiones.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-mono">
-                ${totals.premios.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-mono">
-                <span className={totals.neto >= 0 ? "text-green-600" : "text-red-500"}>
-                  ${totals.neto.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-mono">
-                ${totals.final.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </td>
-              <td className="px-4 py-3" />
+// ─── QuickFilter ──────────────────────────────────────────────────────────────
+function QuickFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#999]" />
+        <input value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder="Filtro rápido"
+          className="pl-7 pr-7 py-1.5 text-xs border border-[#E5E5E0] rounded-lg bg-[#FAFAFA] focus:outline-none focus:border-[#14B8A6] w-44 transition-colors" />
+        {value && (
+          <button onClick={() => onChange("")} className="absolute right-2 top-1/2 -translate-y-1/2">
+            <X size={11} className="text-[#999]" />
+          </button>
+        )}
+      </div>
+      <button onClick={() => onChange("")} className="p-1.5 border border-[#E5E5E0] rounded-lg bg-white hover:bg-[#F5F5F0] transition-colors">
+        <RefreshCw size={13} className="text-[#666]" />
+      </button>
+    </div>
+  );
+}
+
+// ─── FilterPills ──────────────────────────────────────────────────────────────
+function FilterPills({ active, onChange }: { active: FilterPill; onChange: (p: FilterPill) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {PILLS.map((p) => (
+        <button key={p} onClick={() => onChange(p)}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${active === p ? "bg-[#14B8A6] text-white border-[#14B8A6]" : "bg-white text-[#666] border-[#E5E5E0] hover:border-[#14B8A6] hover:text-[#14B8A6]"}`}>
+          {p}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── TAB GENERAL ─────────────────────────────────────────────────────────────
+function TabGeneral() {
+  const [date, setDate]       = useState(new Date().toISOString().slice(0, 10));
+  const [pill, setPill]       = useState<FilterPill>("TODOS");
+  const [subTab, setSubTab]   = useState<"bancas" | "resultados">("bancas");
+  const [quick, setQuick]     = useState("");
+  const [selZonas, setSelZonas] = useState<string[]>(ZONAS.map((z) => z.nombre));
+
+  const filtered = useMemo(() => {
+    const byPill = applyPill(generalRows, pill);
+    const q = quick.toLowerCase();
+    return q ? byPill.filter((r) => r.ref.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q)) : byPill;
+  }, [pill, quick]);
+
+  const totals = useMemo(() => filtered.reduce((acc, r) => ({
+    p: acc.p + r.p, l: acc.l + r.l, w: acc.w + r.w,
+    total: acc.total + r.total, venta: acc.venta + r.venta,
+    comisiones: acc.comisiones + r.comisiones, premios: acc.premios + r.premios,
+    neto: acc.neto + r.neto, final: acc.final + r.final, balance: acc.balance + r.balance,
+  }), { p:0,l:0,w:0,total:0,venta:0,comisiones:0,premios:0,neto:0,final:0,balance:0 }), [filtered]);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <DateInput label="Fecha" value={date} onChange={setDate} />
+          <MultiSelect label="Zonas" options={ZONAS.map((z) => z.nombre)} selected={selZonas} onChange={setSelZonas} />
+          <div className="flex flex-wrap gap-2 flex-1 justify-end">
+            <ActionBtn label="VER VENTAS" variant="primary" />
+            <ActionBtn label="PDF" variant="secondary" />
+            <ActionBtn label="CSV" variant="secondary" />
+            <ActionBtn label="PROCESAR TICKETS DE HOY" variant="ghost" />
+            <ActionBtn label="PROCESAR VENTAS DE AYER" variant="ghost" />
+          </div>
+        </div>
+        <TotalBadge label="Neto (banca/grupos/agentes)" amount={totals.neto} />
+      </div>
+
+      <div className="flex gap-3 border-b border-[#E5E5E0]">
+        {(["bancas","resultados"] as const).map((st) => (
+          <button key={st} onClick={() => setSubTab(st)}
+            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${subTab===st ? "text-[#14B8A6] border-[#14B8A6]" : "text-[#666] border-transparent hover:text-[#333]"}`}>
+            {st.charAt(0).toUpperCase()+st.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <TotalBadge label="Total" amount={totals.neto} />
+
+      <div>
+        <p className="text-sm font-semibold text-[#333] mb-2">Filtros</p>
+        <FilterPills active={pill} onChange={setPill} />
+      </div>
+
+      <div className="flex justify-end mb-2"><QuickFilter value={quick} onChange={setQuick} /></div>
+
+      <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+              {["Ref.","Código","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"].map((h) => (
+                <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555] whitespace-nowrap">{h}</th>
+              ))}
             </tr>
-          }
-        />
-      </motion.div>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={12} className="py-8 text-center text-sm text-[#999]">Sin datos para el filtro seleccionado</td></tr>
+            ) : filtered.map((row, ri) => (
+              <tr key={row.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/30 transition-colors`}>
+                <td className="px-3 py-2 text-[#333]">{row.ref}</td>
+                <td className="px-3 py-2 text-[#14B8A6] font-medium">{row.codigo}</td>
+                <td className="px-3 py-2 text-center">{row.p}</td>
+                <td className="px-3 py-2 text-center">{row.l}</td>
+                <td className="px-3 py-2 text-center">{row.w}</td>
+                <td className="px-3 py-2 text-right">{row.total}</td>
+                <td className="px-3 py-2 text-right">{fmt(row.venta)}</td>
+                <td className="px-3 py-2 text-right">{fmt(row.comisiones)}</td>
+                <td className="px-3 py-2 text-right">{fmt(row.premios)}</td>
+                <td className="px-3 py-2 text-right">{netoCell(row.neto)}</td>
+                <td className="px-3 py-2 text-right">{netoCell(row.final)}</td>
+                <td className="px-3 py-2 text-right">{balanceCell(row.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="bg-[#F0F0EB] font-semibold border-t-2 border-[#E5E5E0]">
+              <td className="px-3 py-2.5" colSpan={2}>Totales</td>
+              <td className="px-3 py-2.5 text-center">{totals.p}</td>
+              <td className="px-3 py-2.5 text-center">{totals.l}</td>
+              <td className="px-3 py-2.5 text-center">{totals.w}</td>
+              <td className="px-3 py-2.5 text-right">{totals.total}</td>
+              <td className="px-3 py-2.5 text-right">{fmt(totals.venta)}</td>
+              <td className="px-3 py-2.5 text-right">{fmt(totals.comisiones)}</td>
+              <td className="px-3 py-2.5 text-right">{fmt(totals.premios)}</td>
+              <td className="px-3 py-2.5 text-right">{netoCell(totals.neto)}</td>
+              <td className="px-3 py-2.5 text-right">{netoCell(totals.final)}</td>
+              <td className="px-3 py-2.5 text-right">{balanceCell(totals.balance)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p className="text-xs text-[#999]">Mostrando {filtered.length} de {generalRows.length} entradas</p>
+    </div>
+  );
+}
+
+// ─── TAB BANCA POR SORTEO ─────────────────────────────────────────────────────
+function TabBancaPorSorteo() {
+  const [fi, setFi] = useState(new Date().toISOString().slice(0, 10));
+  const [ff, setFf] = useState(new Date().toISOString().slice(0, 10));
+  const [selSorteos, setSelSorteos] = useState<string[]>(SORTEOS);
+  const [selZonas, setSelZonas]     = useState<string[]>(ZONAS.map((z) => z.nombre));
+  const [quick, setQuick] = useState("");
+
+  const rows = useMemo(() => BANCAS.map((b) => ({
+    id: b.id, ref: b.ref, banca: b.codigo,
+    totalVendido: 0, totalPremios: 0, totalComisiones: 0, totalNeto: 0,
+  })), []);
+
+  const filtered = useMemo(() => {
+    const q = quick.toLowerCase();
+    return q ? rows.filter((r) => r.ref.toLowerCase().includes(q) || r.banca.toLowerCase().includes(q)) : rows;
+  }, [rows, quick]);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4">
+        <h2 className="text-xl font-bold text-[#333] mb-4 text-center">Montos por sorteo y banca</h2>
+        <div className="flex flex-wrap items-end gap-3 mb-3">
+          <DateInput label="Fecha inicial" value={fi} onChange={setFi} />
+          <DateInput label="Fecha final"   value={ff} onChange={setFf} />
+          <MultiSelect label="Sorteos" options={SORTEOS} selected={selSorteos} onChange={setSelSorteos} />
+          <MultiSelect label="Zonas"   options={ZONAS.map((z) => z.nombre)} selected={selZonas} onChange={setSelZonas} />
+          <ActionBtn label="VER VENTAS" variant="primary" />
+        </div>
+        <TotalBadge label="Total neto" amount={0} />
+      </div>
+      <div className="flex justify-end"><QuickFilter value={quick} onChange={setQuick} /></div>
+      <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+            {["Ref.","Banca","Total Vendido","Total premios","Total comisiones","Total neto"].map((h) => (
+              <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555]">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {filtered.map((r, ri) => (
+              <tr key={r.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/30`}>
+                <td className="px-3 py-2">{r.ref}</td>
+                <td className="px-3 py-2 text-[#14B8A6] font-medium">{r.banca}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.totalVendido)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.totalPremios)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.totalComisiones)}</td>
+                <td className="px-3 py-2 text-right">{netoCell(r.totalNeto)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr className="bg-[#F0F0EB] font-semibold border-t-2 border-[#E5E5E0]">
+            <td className="px-3 py-2.5" colSpan={2}>Totales</td>
+            {["$0.00","$0.00","$0.00"].map((v,i) => <td key={i} className="px-3 py-2.5 text-right">{v}</td>)}
+            <td className="px-3 py-2.5 text-right text-[#999]">$0.00</td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <p className="text-xs text-[#999]">Mostrando {filtered.length} de {rows.length} entradas</p>
+    </div>
+  );
+}
+
+// ─── TAB POR SORTEO ───────────────────────────────────────────────────────────
+function TabPorSorteo() {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selZonas, setSelZonas] = useState<string[]>(ZONAS.map((z) => z.nombre));
+  const [quick, setQuick] = useState("");
+
+  const rows = SORTEOS.map((s, i) => ({ id:`s${i}`, sorteo:s, totalVendido:0, totalPremios:0, totalComisiones:0, totalNeto:0 }));
+  const filtered = useMemo(() => {
+    const q = quick.toLowerCase();
+    return q ? rows.filter((r) => r.sorteo.toLowerCase().includes(q)) : rows;
+  }, [quick]);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4">
+        <h2 className="text-xl font-bold text-[#333] mb-4 text-center">Ventas por sorteo</h2>
+        <div className="flex flex-wrap items-end gap-3 mb-2">
+          <DateInput label="Fecha" value={date} onChange={setDate} />
+          <MultiSelect label="Zonas" options={ZONAS.map((z) => z.nombre)} selected={selZonas} onChange={setSelZonas} />
+          <ActionBtn label="VER VENTAS" variant="primary" />
+        </div>
+        <TotalBadge label="Total neto" amount={0} />
+      </div>
+      <div className="flex justify-end"><QuickFilter value={quick} onChange={setQuick} /></div>
+      <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+            {["Sorteo","Total Vendido","Total premios","Total comisiones","Total neto"].map((h) => (
+              <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555] text-left">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {filtered.map((r, ri) => (
+              <tr key={r.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/30`}>
+                <td className="px-3 py-2 font-medium text-[#333]">{r.sorteo}</td>
+                {[r.totalVendido,r.totalPremios,r.totalComisiones].map((v,i) => <td key={i} className="px-3 py-2 text-right">{fmt(v)}</td>)}
+                <td className="px-3 py-2 text-right">{netoCell(r.totalNeto)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr className="bg-[#F0F0EB] font-semibold border-t-2 border-[#E5E5E0]">
+            <td className="px-3 py-2.5">Totales</td>
+            {["$0.00","$0.00","$0.00"].map((v,i) => <td key={i} className="px-3 py-2.5 text-right">{v}</td>)}
+            <td className="px-3 py-2.5 text-right text-[#999]">$0.00</td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <p className="text-xs text-[#999]">Mostrando {filtered.length} de {rows.length} entradas</p>
+    </div>
+  );
+}
+
+// ─── TAB COMBINACIONES ────────────────────────────────────────────────────────
+function TabCombinaciones() {
+  const [date, setDate]         = useState(new Date().toISOString().slice(0, 10));
+  const [selSorteos, setSelSorteos] = useState<string[]>(SORTEOS);
+  const [selZonas, setSelZonas]     = useState<string[]>(ZONAS.map((z) => z.nombre));
+  const [selBancas, setSelBancas]   = useState<string[]>(BANCAS.map((b) => b.ref));
+
+  const rows = [
+    { id:"c1", comb:"Directo(0)",    vendido:0, com1:0, com2:0, premios:0, balance:0 },
+    { id:"c2", comb:"Pale(0)",       vendido:0, com1:0, com2:0, premios:0, balance:0 },
+    { id:"c3", comb:"Tripleta(0)",   vendido:0, com1:0, com2:0, premios:0, balance:0 },
+    { id:"c4", comb:"Super Pale(0)", vendido:0, com1:0, com2:0, premios:0, balance:0 },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4">
+        <h2 className="text-xl font-bold text-[#333] mb-4 text-center">Combinaciones</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <DateInput label="Fecha" value={date} onChange={setDate} />
+          <MultiSelect label="Sorteos" options={SORTEOS} selected={selSorteos} onChange={setSelSorteos} />
+          <MultiSelect label="Zonas"   options={ZONAS.map((z) => z.nombre)} selected={selZonas} onChange={setSelZonas} />
+          <MultiSelect label="Bancas"  options={BANCAS.map((b) => b.ref)} selected={selBancas} onChange={setSelBancas} />
+          <ActionBtn label="VER VENTAS" variant="primary" />
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+            {["Combinación","Total Vendido","Total comisiones","Total comisiones 2","Total premios","Balances"].map((h) => (
+              <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555] text-left">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {rows.map((r, ri) => (
+              <tr key={r.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/30`}>
+                <td className="px-3 py-2 font-medium">{r.comb}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.vendido)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.com1)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.com2)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.premios)}</td>
+                <td className="px-3 py-2 text-right">{netoCell(r.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr className="bg-[#F0F0EB] font-semibold border-t-2 border-[#E5E5E0]">
+            <td className="px-3 py-2.5">Totales</td>
+            {["$0.00","$0.00","$0.00","$0.00"].map((v,i) => <td key={i} className="px-3 py-2.5 text-right">{v}</td>)}
+            <td className="px-3 py-2.5 text-right text-[#999]">$0.00</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB POR ZONA ─────────────────────────────────────────────────────────────
+function TabPorZona() {
+  const [date, setDate]         = useState(new Date().toISOString().slice(0, 10));
+  const [pill, setPill]         = useState<FilterPill>("TODOS");
+  const [selZonas, setSelZonas] = useState<string[]>(ZONAS.map((z) => z.nombre));
+  const [quick, setQuick]       = useState("");
+
+  const rows = ZONAS.map((z) => ({
+    id:z.id, nombre:z.nombre, p:0, l:0, w:0, total:0,
+    venta:0, comisiones:0, premios:0, neto:0, caida:0, final:0, balance:0,
+  })).filter((r) => selZonas.includes(r.nombre));
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4">
+        <h2 className="text-xl font-bold text-[#333] mb-4">Zonas</h2>
+        <div className="flex flex-wrap items-end gap-3 mb-2">
+          <DateInput label="Fecha" value={date} onChange={setDate} />
+          <MultiSelect label="Zonas" options={ZONAS.map((z) => z.nombre)} selected={selZonas} onChange={setSelZonas} />
+          <ActionBtn label="VER VENTAS" variant="primary" />
+          <ActionBtn label="PDF" variant="secondary" />
+        </div>
+        <TotalBadge label="Total" amount={0} />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-[#333] mb-2">Filtros</p>
+        <FilterPills active={pill} onChange={setPill} />
+      </div>
+      <div className="flex justify-end"><QuickFilter value={quick} onChange={setQuick} /></div>
+      <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+            {["Nombre","P","L","W","Total","Venta","Comisiones","Premios","Neto","Caida","Final","Balance"].map((h) => (
+              <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555]">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {rows.length === 0 ? <tr><td colSpan={12} className="py-6 text-center text-[#999] text-sm">Sin zonas seleccionadas</td></tr>
+            : rows.map((r, ri) => (
+              <tr key={r.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/30`}>
+                <td className="px-3 py-2">{r.nombre}</td>
+                {[r.p,r.l,r.w].map((v,i) => <td key={i} className="px-3 py-2 text-center">{v}</td>)}
+                <td className="px-3 py-2 text-right">{r.total}</td>
+                {[r.venta,r.comisiones,r.premios].map((v,i) => <td key={i} className="px-3 py-2 text-right">{fmt(v)}</td>)}
+                <td className="px-3 py-2 text-right">{netoCell(r.neto)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.caida)}</td>
+                <td className="px-3 py-2 text-right">{netoCell(r.final)}</td>
+                <td className="px-3 py-2 text-right">{balanceCell(r.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB CATEGORÍA DE PREMIOS ─────────────────────────────────────────────────
+function TabCategPremios({ tipo }: { tipo: "directo" | "pale" }) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [quick, setQuick] = useState("");
+  const rows = tipo === "directo"
+    ? [{ id:"p1",premio:"80" },{ id:"p2",premio:"70" }]
+    : [{ id:"q1",premio:"1700" },{ id:"q2",premio:"1500" }];
+  const allRows = rows.map((r) => ({ ...r, p:0,l:0,w:0,total:0,venta:0,comisiones:0,premios:0,neto:0,final:0,balance:0 }));
+  const filtered = useMemo(() => {
+    const q = quick.toLowerCase();
+    return q ? allRows.filter((r) => r.premio.includes(q)) : allRows;
+  }, [quick]);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-4">
+        <TotalBadge label="Total" amount={0} />
+        <div className="flex flex-wrap items-end gap-3 mt-2">
+          <DateInput label="Fecha" value={date} onChange={setDate} />
+          <ActionBtn label="VER REPORTE" variant="primary" />
+        </div>
+      </div>
+      <div className="flex justify-end"><QuickFilter value={quick} onChange={setQuick} /></div>
+      <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
+            {["Premio 1ra","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"].map((h) => (
+              <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555]">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {filtered.map((r, ri) => (
+              <tr key={r.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/30`}>
+                <td className="px-3 py-2 flex items-center gap-1">{r.premio} <Search size={11} className="text-[#999] cursor-pointer" /></td>
+                {[r.p,r.l,r.w].map((v,i) => <td key={i} className="px-3 py-2 text-center">{v}</td>)}
+                <td className="px-3 py-2 text-right">{r.total}</td>
+                {[r.venta,r.comisiones,r.premios].map((v,i) => <td key={i} className="px-3 py-2 text-right">{fmt(v)}</td>)}
+                <td className="px-3 py-2 text-right">{netoCell(r.neto)}</td>
+                <td className="px-3 py-2 text-right">{netoCell(r.final)}</td>
+                <td className="px-3 py-2 text-right">{balanceCell(r.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr className="bg-[#F0F0EB] font-semibold border-t-2 border-[#E5E5E0]">
+            <td className="px-3 py-2.5" colSpan={4}>Totales</td>
+            <td className="px-3 py-2.5 text-right">0</td>
+            {["$0.00","$0.00","$0.00"].map((v,i)=><td key={i} className="px-3 py-2.5 text-right">{v}</td>)}
+            <td className="px-3 py-2.5 text-right text-[#999]">$0.00</td>
+            <td className="px-3 py-2.5 text-right text-[#999]">$0.00</td>
+            <td className="px-3 py-2.5 text-right text-[#3B82F6]">$0.00</td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <p className="text-xs text-[#999]">Mostrando {filtered.length} de {allRows.length} entradas</p>
+    </div>
+  );
+}
+
+// ─── TABS BAR ─────────────────────────────────────────────────────────────────
+const TABS = ["General","Banca por sorteo","Por sorteo","Combinaciones","Por zona","Categoría de Premios","Categoría de Premios para Pale"] as const;
+type Tab = typeof TABS[number];
+
+export default function VentasDelDia() {
+  const [activeTab, setActiveTab] = useState<Tab>("General");
+
+  return (
+    <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.3 }}>
+      {/* Tab Bar */}
+      <div className="flex overflow-x-auto border-b border-[#E5E5E0] mb-5" style={{ scrollbarWidth:"none" }}>
+        {TABS.map((tab) => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`flex-shrink-0 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
+              activeTab===tab ? "text-[#14B8A6] border-[#14B8A6] bg-[#E0F7F5]/30" : "text-[#666] border-transparent hover:text-[#333] hover:border-[#CCC]"
+            }`}>
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div key={activeTab} initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }} transition={{ duration:0.18 }}>
+          {activeTab==="General"                        && <TabGeneral />}
+          {activeTab==="Banca por sorteo"               && <TabBancaPorSorteo />}
+          {activeTab==="Por sorteo"                     && <TabPorSorteo />}
+          {activeTab==="Combinaciones"                  && <TabCombinaciones />}
+          {activeTab==="Por zona"                       && <TabPorZona />}
+          {activeTab==="Categoría de Premios"           && <TabCategPremios tipo="directo" />}
+          {activeTab==="Categoría de Premios para Pale" && <TabCategPremios tipo="pale" />}
+        </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 }

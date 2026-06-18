@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { ChevronLeft, Plus, Check } from "lucide-react";
+import { zones as zonesData } from "@/data/mockData";
 
-const availableZones = ["Default", "SFM"];
+const availableZones = zonesData.map((z) => z.name);
 
 const availableEmailTypes = [
   "Reportes diarios",

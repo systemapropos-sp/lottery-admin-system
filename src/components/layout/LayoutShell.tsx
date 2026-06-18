@@ -11,6 +11,7 @@ interface LayoutShellProps {
 
 export default function LayoutShell({ children }: LayoutShellProps) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const sidebarExpanded = useAuthStore((s) => s.sidebarExpanded);
 
   if (!isAuthenticated) {
     return null;
@@ -25,7 +26,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
       <HeaderBar />
 
       {/* Main Content */}
-      <main className="ml-[260px] pt-[56px] min-h-[100dvh] bg-[#F5F5F0]">
+      <main
+className="pt-[111px] min-h-[100dvh] bg-[#F5F5F0] transition-[margin] duration-[250ms] ease-out"
+        style={{ marginLeft: isAuthenticated ? (sidebarExpanded ? 260 : 60) : 0 }}
+      >
         <motion.div
           key={typeof window !== "undefined" ? window.location.hash : ""}
           initial={{ opacity: 0, y: 8 }}

@@ -1,11 +1,76 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Eye, Pencil, Trash2, Calendar, X } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Calendar, X, ChevronDown } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import DataTable from "@/components/ui/DataTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Column } from "@/components/ui/DataTable";
 import { transactions } from "@/data/mockData";
+
+// ─── NMV Data ─────────────────────────────────────────────────────────────────
+const NMV_BANCAS = [
+  {id:"b01",code:"NMV-0001",name:"NMV RD 01"},
+  {id:"b02",code:"NMV-0002",name:"NMV RD 02"},
+  {id:"b03",code:"NMV-0003",name:"NMV RD 03"},
+  {id:"b04",code:"NMV-0004",name:"NMV RD 04"},
+  {id:"b05",code:"NMV-0005",name:"NMV RD 05"},
+  {id:"b06",code:"NMV-0006",name:"NMV RD 06"},
+  {id:"b07",code:"NMV-0007",name:"NMV RD 07"},
+  {id:"b08",code:"NMV-0008",name:"NMV RD 08"},
+  {id:"b09",code:"NMV-0009",name:"NMV RD 09"},
+  {id:"b10",code:"NMV-0010",name:"NMV RD 10"},
+  {id:"b11",code:"NMV-0011",name:"NMV RD 11"},
+  {id:"b12",code:"NMV-0012",name:"NMV RD 12"},
+  {id:"b13",code:"NMV-0013",name:"NMV RD 13"},
+];
+const NMV_ZONAS = [{id:"z1",nombre:"Default"},{id:"z2",nombre:"SFM"}];
+
+// ─── Multi-Select Reusable ─────────────────────────────────────────────────────
+function MultiSelectDropdown({items,selected,onChange,placeholder,labelKey="name",idKey="id"}:{
+  items:{[k:string]:string}[];selected:string[];onChange:(v:string[])=>void;placeholder:string;labelKey?:string;idKey?:string;
+}) {
+  const [open,setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node))setOpen(false);};
+    document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);
+  },[]);
+  const toggle=(id:string)=>onChange(selected.includes(id)?selected.filter(s=>s!==id):[...selected,id]);
+  const label = selected.length===0?placeholder:selected.length===items.length?"Todas":
+    selected.length<=2?selected.map(id=>items.find(i=>i[idKey]===id)?.[labelKey]??"").join(", "):`${selected.length} seleccionadas`;
+  return(
+    <div ref={ref} className="relative">
+      <button type="button" onClick={()=>setOpen(v=>!v)}
+        className={`flex items-center justify-between gap-2 px-3 py-2.5 text-sm border rounded-lg bg-white transition-all min-w-[190px] ${
+          open||selected.length>0?"border-[#4ECDC4] ring-2 ring-[#4ECDC4]/15":"border-[#E5E5E0] hover:border-[#CCCCCC]"
+        }`}>
+        <span className={`truncate ${selected.length>0?"text-[#333] font-medium":"text-[#999]"}`}>{label}</span>
+        <ChevronDown size={13} className={`text-[#999] flex-shrink-0 transition-transform ${open?"rotate-180":""}`}/>
+      </button>
+      <AnimatePresence>
+        {open&&(
+          <motion.div initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}} transition={{duration:0.15}}
+            className="absolute top-full mt-1 left-0 z-20 bg-white border border-[#E5E5E0] rounded-xl shadow-xl p-2 min-w-[210px] max-h-56 overflow-y-auto">
+            <label className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm border-b border-[#F0F0EB] mb-1">
+              <input type="checkbox" checked={selected.length===items.length}
+                onChange={()=>onChange(selected.length===items.length?[]:items.map(i=>i[idKey]))}
+                className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
+              <span className="font-semibold text-[#333]">Todas</span>
+            </label>
+            {items.map(item=>(
+              <label key={item[idKey]} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm transition-colors">
+                <input type="checkbox" checked={selected.includes(item[idKey])} onChange={()=>toggle(item[idKey])}
+                  className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
+                <span className="text-[#333]">{item[labelKey]}</span>
+                {item.code&&<span className="text-[#AAA] text-xs ml-auto">{item.code}</span>}
+              </label>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 interface CobroRow {
   id: string;
@@ -21,6 +86,8 @@ interface CobroRow {
 
 export default function ListaCobros() {
   const [filterType, setFilterType] = useState("");
+  const [filterBancas, setFilterBancas] = useState<string[]>([]);
+  const [filterZonas, setFilterZonas] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -56,6 +123,17 @@ export default function ListaCobros() {
   const filteredData = useMemo(() => {
     return allData.filter((row) => {
       if (filterType && row.tipo !== filterType) return false;
+      if (filterBancas.length > 0) {
+        const b = NMV_BANCAS.find(b=>filterBancas.includes(b.id));
+        if (b && row.banca !== b.name && row.banca !== b.code) {
+          // check any match
+          const matchesBanca = filterBancas.some(fid => {
+            const fb = NMV_BANCAS.find(x=>x.id===fid);
+            return fb && (row.banca === fb.name || row.banca === fb.code);
+          });
+          if (!matchesBanca) return false;
+        }
+      }
       if (startDate) {
         const rowDate = new Date(row.fecha.split("/").reverse().join("-"));
         if (rowDate < new Date(startDate)) return false;
@@ -66,7 +144,7 @@ export default function ListaCobros() {
       }
       return true;
     });
-  }, [allData, filterType, startDate, endDate]);
+  }, [allData, filterType, filterBancas, startDate, endDate]);
 
   const columns: Column<CobroRow>[] = [
     { key: "numero", header: "Numero", accessor: (r) => r.numero, sortable: true, align: "center", width: "70px" },
@@ -163,6 +241,14 @@ export default function ListaCobros() {
               <option value="PAGO">Pago</option>
             </select>
           </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Bancas</label>
+            <MultiSelectDropdown items={NMV_BANCAS as unknown as {[k:string]:string}[]} selected={filterBancas} onChange={setFilterBancas} placeholder="Todas las bancas"/>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Zona</label>
+            <MultiSelectDropdown items={NMV_ZONAS.map(z=>({id:z.id,name:z.nombre})) as unknown as {[k:string]:string}[]} selected={filterZonas} onChange={setFilterZonas} placeholder="Todas las zonas"/>
+          </div>
         </div>
       </motion.div>
 
@@ -215,17 +301,13 @@ export default function ListaCobros() {
                     </label>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#666666] mb-1.5">Banca</label>
-                  <select value={formBanca} onChange={(e) => setFormBanca(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors">
-                    <option value="">Seleccionar banca</option>
-                    <option value="bp-001">MATADOR-SPORT</option>
-                    <option value="bp-002">MMW RD 02</option>
-                    <option value="bp-003">MMW RD 03</option>
-                    <option value="bp-004">MMW RD 04</option>
-                    <option value="bp-005">MMW RD 05</option>
-                  </select>
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-[#666666] mb-1.5">Banca</label>
+                   <select value={formBanca} onChange={(e) => setFormBanca(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors">
+                     <option value="">Seleccionar banca</option>
+                     {NMV_BANCAS.map(b=><option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}
+                   </select>
+                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1.5">Banco</label>
                   <select value={formBanco} onChange={(e) => setFormBanco(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors">

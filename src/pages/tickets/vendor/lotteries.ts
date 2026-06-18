@@ -1,0 +1,25 @@
+import type { Lottery } from './types';
+
+export const lotteries: Lottery[] = [
+  { id: 'a10', name: 'Anguila 10AM',     shortName: 'A10', closingTime: '09:45', schedule: '10:00 AM', color: '#F59E0B', closed: false },
+  { id: 'a11', name: 'Anguila 11AM',     shortName: 'A11', closingTime: '10:45', schedule: '11:00 AM', color: '#D97706', closed: false },
+  { id: 'lpr', name: 'La Primera',       shortName: 'LPR', closingTime: '11:30', schedule: '12:00 PM', color: '#EF4444', closed: false },
+  { id: 'lsu', name: 'La Suerte',        shortName: 'LSU', closingTime: '12:00', schedule: '12:30 PM', color: '#8B5CF6', closed: false },
+  { id: 'kla', name: 'King Lottery AM',  shortName: 'KLA', closingTime: '12:00', schedule: '12:30 PM', color: '#FBBF24', closed: false },
+  { id: 'ltk', name: 'Lotedom',          shortName: 'LTK', closingTime: '13:00', schedule: '1:00 PM',  color: '#10B981', closed: false },
+  { id: 'qrl', name: 'Quiniela Real',    shortName: 'QRL', closingTime: '13:30', schedule: '1:30 PM',  color: '#EC4899', closed: false },
+  { id: 'a1p', name: 'Anguila 1PM',      shortName: 'A1P', closingTime: '12:30', schedule: '1:00 PM',  color: '#F97316', closed: false },
+  { id: 'fla', name: 'Florida AM',       shortName: 'FLA', closingTime: '13:00', schedule: '1:30 PM',  color: '#3B82F6', closed: false },
+  { id: 'nya', name: 'New York AM',      shortName: 'NYA', closingTime: '14:00', schedule: '2:30 PM',  color: '#1D4ED8', closed: false },
+  { id: 'a6p', name: 'Anguila 6PM',      shortName: 'A6P', closingTime: '17:30', schedule: '6:00 PM',  color: '#B45309', closed: false },
+  { id: 'ls6', name: 'La Suerte 6PM',    shortName: 'LS6', closingTime: '17:30', schedule: '6:00 PM',  color: '#7C3AED', closed: false },
+  { id: 'gms', name: 'Gana Mas',         shortName: 'GMS', closingTime: '17:30', schedule: '6:00 PM',  color: '#059669', closed: false },
+  { id: 'ltc', name: 'Loteca',           shortName: 'LTC', closingTime: '18:00', schedule: '6:30 PM',  color: '#64748B', closed: false },
+  { id: 'lp7', name: 'La Primera 7PM',   shortName: 'LP7', closingTime: '18:30', schedule: '7:00 PM',  color: '#DC2626', closed: false },
+  { id: 'qnp', name: 'Quiniela Pale',    shortName: 'QNP', closingTime: '19:00', schedule: '7:30 PM',  color: '#DB2777', closed: false },
+  { id: 'nac', name: 'Nacional',         shortName: 'NAC', closingTime: '20:30', schedule: '9:00 PM',  color: '#0EA5E9', closed: false },
+  { id: 'klp', name: 'King Lottery PM',  shortName: 'KLP', closingTime: '19:00', schedule: '7:30 PM',  color: '#D97706', closed: false },
+  { id: 'a9p', name: 'Anguila 9PM',      shortName: 'A9P', closingTime: '20:30', schedule: '9:00 PM',  color: '#F59E0B', closed: false },
+  { id: 'flp', name: 'Florida PM',       shortName: 'FLP', closingTime: '21:00', schedule: '9:30 PM',  color: '#3B82F6', closed: false },
+  { id: 'nyp', name: 'New York PM',      shortName: 'NYP', closingTime: '22:30', schedule: '11:00 PM', color: '#2563EB', closed: false },
+];

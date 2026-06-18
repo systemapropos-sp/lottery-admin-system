@@ -1,154 +1,138 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import DataTable from "@/components/ui/DataTable";
+import { RefreshCw, ChevronDown } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { zones, bettingPools } from "@/data/mockData";
 
-interface ZoneSalesRow {
-  id: string;
-  zona: string;
-  bancas: number;
-  tickets: number;
-  venta: number;
-  comision1: number;
-  comision2: number;
-  premios: number;
-  neto: number;
-  final: number;
+// ─── Mock data ────────────────────────────────────────────────────────────────
+const MOCK_ZONAS = [
+  { zona: "Default", bancas: 19, tickets: 417, venta: 168880, comision1: 0, comision2: 0, premios: 157200, neto: 11680, final: 11680 },
+  { zona: "SFM",     bancas:  3, tickets:  82, venta:  25540, comision1: 439.20, comision2: 0, premios: 11360, neto: 13740.80, final: 13740.80 },
+];
+const ZONAS_LIST = ["Default", "SFM"];
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
 
-function generateZoneSales(): ZoneSalesRow[] {
-  return zones.map((z) => {
-    const poolsInZone = bettingPools.filter((bp) => bp.zoneId === z.id);
-    const bancas = poolsInZone.length;
-    const venta = Math.random() * 150000 + 10000;
-    const comision1 = venta * 0.12;
-    const comision2 = venta * 0.05;
-    const premios = Math.random() * 80000;
-    return {
-      id: z.id,
-      zona: z.name,
-      bancas,
-      tickets: Math.floor(Math.random() * 500) + bancas * 20,
-      venta,
-      comision1,
-      comision2,
-      premios,
-      neto: venta - comision1 - comision2 - premios,
-      final: venta - comision1 - comision2 - premios + poolsInZone.reduce((s, bp) => s + bp.balance, 0),
-    };
-  });
+function today() { return new Date().toISOString().split("T")[0]; }
+
+// ─── MultiSelect ──────────────────────────────────────────────────────────────
+function MultiSelect({ label, options, value, onChange }: {
+  label: string; options: string[]; value: string[]; onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (o: string) => onChange(value.includes(o) ? value.filter(x => x !== o) : [...value, o]);
+  const txt = value.length === 0 || value.length === options.length ? `${options.length} seleccionadas` : `${value.length} seleccionadas`;
+  return (
+    <div className="relative">
+      <label className="text-xs text-[#999] font-medium block mb-1">{label}</label>
+      <button onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg bg-white min-w-[160px] hover:border-[#4ECDC4] transition-colors">
+        <span className="flex-1 text-left text-[#555]">{txt}</span>
+        <ChevronDown size={14} className={`text-[#999] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 top-full mt-1 bg-white border border-[#E5E5E0] rounded-xl shadow-lg min-w-[180px] p-2">
+          {options.map(o => (
+            <label key={o} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm text-[#333]">
+              <input type="checkbox" checked={value.includes(o)} onChange={() => toggle(o)} className="accent-[#4ECDC4]" />
+              {o}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function VentasZonas() {
-  const [selectedDate, setSelectedDate] = useState("2024-05-15");
-  const [selectedZone, setSelectedZone] = useState("");
-  const [data] = useState<ZoneSalesRow[]>(generateZoneSales);
+  const [fecha, setFecha] = useState(today());
+  const [selZonas, setSelZonas] = useState<string[]>([]);
+  const [rows, setRows] = useState(MOCK_ZONAS);
 
-  const filtered = selectedZone ? data.filter((r) => r.zona === selectedZone) : data;
+  const filtered = useMemo(() => {
+    if (selZonas.length === 0) return rows;
+    return rows.filter(r => selZonas.includes(r.zona));
+  }, [rows, selZonas]);
 
-  const columns = [
-    { key: "zona", header: "Zona", accessor: (r: ZoneSalesRow) => r.zona, sortable: true },
-    { key: "bancas", header: "Bancas", accessor: (r: ZoneSalesRow) => r.bancas, sortable: true, align: "center" as const },
-    { key: "tickets", header: "Tickets", accessor: (r: ZoneSalesRow) => r.tickets, sortable: true, align: "center" as const },
-    {
-      key: "venta", header: "Venta", accessor: (r: ZoneSalesRow) => r.venta, sortable: true, align: "right" as const,
-      formatter: (_v: unknown, r: ZoneSalesRow) => `$${r.venta.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "comision1", header: "Comision 1", accessor: (r: ZoneSalesRow) => r.comision1, sortable: true, align: "right" as const,
-      formatter: (_v: unknown, r: ZoneSalesRow) => `$${r.comision1.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "comision2", header: "Comision 2", accessor: (r: ZoneSalesRow) => r.comision2, sortable: true, align: "right" as const,
-      formatter: (_v: unknown, r: ZoneSalesRow) => `$${r.comision2.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "premios", header: "Premios", accessor: (r: ZoneSalesRow) => r.premios, sortable: true, align: "right" as const,
-      formatter: (_v: unknown, r: ZoneSalesRow) => `$${r.premios.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-    {
-      key: "neto", header: "Neto", accessor: (r: ZoneSalesRow) => r.neto, sortable: true, align: "right" as const,
-      cell: (r: ZoneSalesRow) => (
-        <span className={r.neto >= 0 ? "text-green-600" : "text-red-500"}>
-          ${r.neto.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-        </span>
-      ),
-    },
-    {
-      key: "final", header: "Final", accessor: (r: ZoneSalesRow) => r.final, sortable: true, align: "right" as const,
-      formatter: (_v: unknown, r: ZoneSalesRow) => `$${r.final.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-    },
-  ];
+  function handleSearch() { setRows([...MOCK_ZONAS]); }
 
-  const totals = filtered.reduce(
-    (acc, r) => ({
-      bancas: acc.bancas + r.bancas,
-      tickets: acc.tickets + r.tickets,
-      venta: acc.venta + r.venta,
-      comision1: acc.comision1 + r.comision1,
-      comision2: acc.comision2 + r.comision2,
-      premios: acc.premios + r.premios,
-      neto: acc.neto + r.neto,
-      final: acc.final + r.final,
-    }),
-    { bancas: 0, tickets: 0, venta: 0, comision1: 0, comision2: 0, premios: 0, neto: 0, final: 0 }
-  );
+  const tot = useMemo(() => ({
+    bancas:    filtered.reduce((s, r) => s + r.bancas, 0),
+    tickets:   filtered.reduce((s, r) => s + r.tickets, 0),
+    venta:     filtered.reduce((s, r) => s + r.venta, 0),
+    comision1: filtered.reduce((s, r) => s + r.comision1, 0),
+    comision2: filtered.reduce((s, r) => s + r.comision2, 0),
+    premios:   filtered.reduce((s, r) => s + r.premios, 0),
+    neto:      filtered.reduce((s, r) => s + r.neto, 0),
+    final:     filtered.reduce((s, r) => s + r.final, 0),
+  }), [filtered]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
-      <PageHeader title="Ventas por Zonas" subtitle="Resumen de ventas agrupado por zona" />
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-5">
+      <PageHeader title="Resumen de venta" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-4"
-      >
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1.5 min-w-[160px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Fecha</label>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors" />
-          </div>
-          <div className="flex flex-col gap-1.5 min-w-[160px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Zona</label>
-            <select value={selectedZone} onChange={(e) => setSelectedZone(e.target.value)}
-              className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors">
-              <option value="">Todas</option>
-              {zones.map((z) => (
-                <option key={z.id} value={z.name}>{z.name}</option>
-              ))}
-            </select>
-          </div>
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 flex flex-wrap items-end gap-4">
+        <div>
+          <label className="text-xs text-[#999] font-medium block mb-1">Fecha</label>
+          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+            className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]" />
         </div>
-      </motion.div>
+        <MultiSelect label="Zona" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas} />
+        <button onClick={handleSearch}
+          className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] transition-colors shadow-sm">
+          <RefreshCw size={14} /> VER VENTAS
+        </button>
+      </div>
 
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-      >
-        <DataTable
-          columns={columns}
-          data={filtered}
-          keyExtractor={(r) => r.id}
-          pageSize={10}
-          summaryRow={
-            <tr className="bg-[#F0F0EB] font-semibold text-[#333333]">
-              <td className="px-4 py-3 text-right text-sm">TOTALES</td>
-              <td className="px-4 py-3 text-center text-sm font-mono">{totals.bancas}</td>
-              <td className="px-4 py-3 text-center text-sm font-mono">{totals.tickets}</td>
-              <td className="px-4 py-3 text-right text-sm font-mono">${totals.venta.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-              <td className="px-4 py-3 text-right text-sm font-mono">${totals.comision1.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-              <td className="px-4 py-3 text-right text-sm font-mono">${totals.comision2.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-              <td className="px-4 py-3 text-right text-sm font-mono">${totals.premios.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-              <td className="px-4 py-3 text-right text-sm font-mono">
-                <span className={totals.neto >= 0 ? "text-green-600" : "text-red-500"}>
-                  ${totals.neto.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-mono">${totals.final.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-            </tr>
-          }
-        />
-      </motion.div>
+      {/* Summary table */}
+      {filtered.map(r => (
+        <motion.div key={r.zona} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl border border-[#E5E5E0] overflow-hidden shadow-sm">
+          <div className="bg-[#F8F8F5] px-5 py-3 border-b border-[#E5E5E0]">
+            <h3 className="text-base font-bold text-[#333]">Zona: <span className="text-[#4ECDC4]">{r.zona}</span></h3>
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {[
+                { label: "Zona",       val: r.zona,              isText: true },
+                { label: "Bancas",     val: r.bancas,            isText: true },
+                { label: "Tickets",    val: r.tickets,           isText: true },
+                { label: "Venta",      val: fmt(r.venta),        isText: true },
+                { label: "Comision 1", val: fmt(r.comision1),    isText: true },
+                { label: "Comision 2", val: fmt(r.comision2),    isText: true },
+                { label: "Premios",    val: fmt(r.premios),      isText: true },
+                { label: "Neto",       val: fmt(r.neto),         isBlue: true },
+                { label: "Final",      val: fmt(r.final),        isBlue: true },
+              ].map((item, i) => (
+                <tr key={item.label} className={i % 2 === 0 ? "bg-white" : "bg-[#FAFAFA]"}>
+                  <td className="px-5 py-3 font-semibold text-[#444] w-[200px] border-b border-[#F0F0EB]">{item.label}</td>
+                  <td className={`px-5 py-3 border-b border-[#F0F0EB] font-medium ${item.isBlue ? "bg-sky-50 text-sky-700 font-bold" : "text-[#333]"}`}>
+                    {String(item.val)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </motion.div>
+      ))}
+
+      {/* Totales when multiple zones */}
+      {filtered.length > 1 && (
+        <div className="bg-white rounded-xl border border-[#E5E5E0] p-4 flex flex-wrap gap-6">
+          {[
+            { label: "Total Venta", val: fmt(tot.venta) },
+            { label: "Total Premios", val: fmt(tot.premios) },
+            { label: "Total Neto", val: fmt(tot.neto), blue: true },
+          ].map(c => (
+            <div key={c.label} className={`flex flex-col items-center px-6 py-3 rounded-xl ${c.blue ? "bg-sky-50" : "bg-[#F8F8F5]"}`}>
+              <span className="text-xs text-[#999] font-medium uppercase tracking-wide">{c.label}</span>
+              <span className={`text-lg font-bold mt-1 ${c.blue ? "text-sky-700" : "text-[#333]"}`}>{c.val}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

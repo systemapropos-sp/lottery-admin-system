@@ -13,34 +13,34 @@ export interface QuickAccessItem {
 // ─── Default Available Items (pool of all possible shortcuts) ─────────────────
 
 export const DEFAULT_AVAILABLE_ITEMS: QuickAccessItem[] = [
-  { id: "monitor-tickets", label: "Monitor de tickets", icon: "FileText", route: "/tickets", color: "#4ECDC4" },
-  { id: "pendientes-pago", label: "Pendientes de pago", icon: "Wallet", route: "/clean-pending-for-payment", color: "#4ECDC4" },
-  { id: "ventas-historicas", label: "Ventas historicas", icon: "BarChart3", route: "/sales/historical", color: "#4ECDC4" },
-  { id: "horarios", label: "Horarios", icon: "Clock", route: "/sortition-schedules", color: "#4ECDC4" },
-  { id: "configuracion", label: "Configuracion", icon: "Settings", route: "/settings", color: "#4ECDC4" },
-  { id: "duplicar", label: "Duplicar", icon: "Copy", route: "/tickets/create", color: "#4ECDC4" },
-  { id: "generador", label: "Generador", icon: "Shuffle", route: "/betting-pool-play-monitor", color: "#4ECDC4" },
-  { id: "ayuda", label: "Ayuda", icon: "HelpCircle", route: "/settings", color: "#4ECDC4" },
-  { id: "crear-ticket", label: "Crear ticket", icon: "Ticket", route: "/tickets/create", color: "#4ECDC4" },
-  { id: "resultados", label: "Resultados", icon: "Trophy", route: "/results", color: "#4ECDC4" },
-  { id: "bancas", label: "Bancas", icon: "Store", route: "/betting-pools", color: "#4ECDC4" },
-  { id: "usuarios", label: "Usuarios", icon: "Users", route: "/users", color: "#4ECDC4" },
-  { id: "cobros", label: "Cobros/Pagos", icon: "Banknote", route: "/simplified-accountable-transaction-groups", color: "#4ECDC4" },
-  { id: "limites", label: "Limites", icon: "Shield", route: "/limits", color: "#4ECDC4" },
-  { id: "notificaciones", label: "Notificaciones", icon: "Bell", route: "/notifications/new", color: "#4ECDC4" },
+  { id: "dashboard",      label: "Dashboard",          icon: "LayoutDashboard", route: "/dashboard",                        color: "#6366F1" },
+  { id: "pizarra",        label: "Pizarra Tickets",    icon: "FileText",        route: "/tickets/pizarra",                  color: "#14B8A6" },
+  { id: "ventas",         label: "Crear Ticket",       icon: "Ticket",          route: "/tickets/crear",                    color: "#0EA5E9" },
+  { id: "resultados",     label: "Resultados",         icon: "Trophy",          route: "/resultados",                       color: "#F59E0B" },
+  { id: "sorteos",        label: "Lista Sorteos",      icon: "CalendarDays",    route: "/sorteos/lista",                    color: "#8B5CF6" },
+  { id: "horarios",       label: "Horario Sorteos",    icon: "Clock",           route: "/sorteos/horarios",                 color: "#EC4899" },
+  { id: "bancas",         label: "Bancas",             icon: "Store",           route: "/accountable-entities/bancas",      color: "#10B981" },
+  { id: "cobradores",     label: "Cobradores",         icon: "Briefcase",       route: "/cobradores",                       color: "#F97316" },
+  { id: "limites",        label: "Límites Números",    icon: "Shield",          route: "/limits/numbers",                   color: "#EF4444" },
+  { id: "notificaciones", label: "Notificaciones",     icon: "Bell",            route: "/notificaciones",                   color: "#3B82F6" },
+  { id: "superadmin",     label: "Panel Admin",        icon: "ShieldCheck",     route: "/superadmin",                       color: "#7C3AED" },
+  { id: "configuracion",  label: "Configuración",      icon: "Settings",        route: "/settings",                         color: "#64748B" },
+  { id: "monitoreo",      label: "Monitoreo F8",       icon: "Monitor",         route: "/monitoreo",                        color: "#0891B2" },
+  { id: "zonas",          label: "Zonas",              icon: "Map",             route: "/accountable-entities/zonas",        color: "#84CC16" },
+  { id: "transacciones",  label: "Transacciones",      icon: "ArrowLeftRight",  route: "/transacciones",                    color: "#F59E0B" },
 ];
 
 // ─── Default Active Items (shown in quick access panel) ───────────────────────
 
 export const DEFAULT_ACTIVE_IDS = [
-  "monitor-tickets",
-  "pendientes-pago",
-  "ventas-historicas",
+  "dashboard",
+  "pizarra",
+  "ventas",
+  "resultados",
+  "sorteos",
   "horarios",
-  "configuracion",
-  "duplicar",
-  "generador",
-  "ayuda",
+  "bancas",
+  "cobradores",
 ];
 
 // ─── Store Interface ──────────────────────────────────────────────────────────

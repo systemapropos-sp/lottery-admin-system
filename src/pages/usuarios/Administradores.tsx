@@ -59,7 +59,7 @@ export default function Administradores() {
                     })}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                    <div className="flex items-center justify-center gap-1">
                       <button className="p-1.5 rounded-md hover:bg-[rgba(78,205,196,0.1)] text-[#666666] hover:text-[#4ECDC4] transition-colors">
                         <Eye size={14} />
                       </button>

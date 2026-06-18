@@ -1,6 +1,85 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { AdminUser } from "@/data/mockData";
 import { adminUsers } from "@/data/mockData";
+
+// ─── Banca Permissions ──────────────────────────────────────────────────────────
+
+export const BANCA_PERMISSION_KEYS = [
+  "monitoreo", "pendiente_pago", "balances", "contabilidad", "clientes",
+  "ventas_historicas", "imprimir_reporte", "duplicar_jugadas", "jugadas",
+  "pagar", "ver_ventas", "horarios", "ayuda", "configuracion",
+  "autorizar_ponchado", "reportes", "generador_jugadas",
+] as const;
+
+export type BancaPermKey = typeof BANCA_PERMISSION_KEYS[number];
+
+export const BANCA_PERM_LABELS: Record<BancaPermKey, string> = {
+  monitoreo:             "Monitoreo",
+  pendiente_pago:        "Pendiente de Pago",
+  balances:              "Balances",
+  contabilidad:          "Contabilidad",
+  clientes:              "Clientes",
+  ventas_historicas:     "Ventas Historicas",
+  imprimir_reporte:      "Imprimir Reporte",
+  duplicar_jugadas:      "Duplicar Jugadas",
+  jugadas:               "Jugadas",
+  pagar:                 "Pagar",
+  ver_ventas:            "Ver Ventas",
+  horarios:              "Horarios",
+  ayuda:                 "Ayuda",
+  configuracion:         "Configuracion",
+  autorizar_ponchado:    "Autorizar Ponchado",
+  reportes:              "Reportes",
+  generador_jugadas:     "Generador de Jugadas Aleatorias",
+};
+
+export type BancaPerms = Record<BancaPermKey, boolean>;
+export type BancaPermissions = Record<string, BancaPerms>; // bancaId → perms
+
+export interface PermLogEntry {
+  id: string;
+  timestamp: string;
+  bancaId: string;
+  bancaName: string;
+  permKey: BancaPermKey;
+  permLabel: string;
+  value: boolean;
+  adminUser: string;
+}
+
+// Default: all ON
+function defaultPerms(): BancaPerms {
+  return Object.fromEntries(
+    BANCA_PERMISSION_KEYS.map((k) => [k, true])
+  ) as BancaPerms;
+}
+
+// ── LocalStorage helpers ──────────────────────────────────────────────────────
+const LS_PERMS_KEY = "nmv_banca_perms";
+const LS_LOG_KEY   = "nmv_perm_log";
+
+function loadPerms(): BancaPermissions {
+  try {
+    const raw = localStorage.getItem(LS_PERMS_KEY);
+    return raw ? (JSON.parse(raw) as BancaPermissions) : {};
+  } catch { return {}; }
+}
+
+function savePerms(p: BancaPermissions) {
+  try { localStorage.setItem(LS_PERMS_KEY, JSON.stringify(p)); } catch {}
+}
+
+function loadLog(): PermLogEntry[] {
+  try {
+    const raw = localStorage.getItem(LS_LOG_KEY);
+    return raw ? (JSON.parse(raw) as PermLogEntry[]) : [];
+  } catch { return []; }
+}
+
+function saveLog(log: PermLogEntry[]) {
+  try { localStorage.setItem(LS_LOG_KEY, JSON.stringify(log.slice(0, 500))); } catch {}
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -26,6 +105,7 @@ interface AuthState {
 
   // Sidebar
   sidebarExpanded: boolean;
+  sidebarPinned: boolean;
   expandedGroups: SidebarGroupState;
 
   // UI
@@ -40,8 +120,16 @@ interface AuthState {
 
   // Sidebar actions
   toggleSidebar: () => void;
+  toggleSidebarPin: () => void;
   toggleGroup: (groupKey: string) => void;
   setGroupExpanded: (groupKey: string, expanded: boolean) => void;
+
+  // Banca Permissions
+  bancaPermissions: BancaPermissions;
+  permissionsLog: PermLogEntry[];
+  getBancaPerms: (bancaId: string) => BancaPerms;
+  setBancaPermission: (bancaId: string, bancaName: string, permKey: BancaPermKey, value: boolean) => void;
+  resetBancaPerms: (bancaId: string) => void;
 
   // UI actions
   setLanguage: (lang: "es" | "en") => void;
@@ -64,6 +152,11 @@ export const translations = {
     "login.loading": "Cargando...",
     "login.drivers": "Descargar Drivers de printers",
     "login.firefox": "Firefox Silent Print: print.always_print_silent",
+
+    // SuperAdmin
+    "nav.superadmin": "ADMIN",
+    "nav.superadmin.panel": "PANEL ADMIN",
+    "nav.log": "LOG OPERACIONES",
 
     // Sidebar
     "nav.inicio": "INICIO",
@@ -90,7 +183,7 @@ export const translations = {
     "nav.sales.percentages": "Porcentajes",
     "nav.sales.pools": "Bancas",
     "nav.sales.zones": "Zonas",
-    "nav.tickets.create": "Crear",
+    "nav.tickets.create":  "Crear",
     "nav.tickets.monitor": "Monitoreo",
     "nav.tickets.plays": "Jugadas",
     "nav.tickets.winners": "Jugadas ganadoras",
@@ -120,15 +213,51 @@ export const translations = {
     "nav.limits.list": "Lista",
     "nav.limits.create": "Crear",
     "nav.limits.automatic": "Limites automaticos",
+    "nav.limits.delete": "Eliminar",
+    "nav.limits.numeros": "Límites de Números",
+    "nav.limits.limitacion": "Limitación de Números",
+    "nav.movil": "MÓVIL",
+    "nav.movil.crear-cliente": "Crear cliente",
+    "nav.movil.clientes": "Lista de clientes",
+    "nav.movil.retiro": "Retiro",
+    "nav.movil.recargas": "Recargas",
+    "nav.movil.cancelar": "Cancelar recarga",
+    "nav.movil.tickets": "Tickets",
+    "nav.movil.premios": "Premios",
+    "nav.movil.reporte": "Ver reporte",
     "nav.sorteos.list": "Lista",
     "nav.sorteos.schedule": "Horario",
     "nav.zones.list": "Lista",
     "nav.zones.create": "Crear",
     "nav.zones.manage": "Manejar",
-    "nav.entities.list": "Lista",
-    "nav.entities.create": "Crear",
+    "nav.entities.bancas":    "Bancas",
+    "nav.entities.empleados": "Empleados",
+    "nav.entities.bancos":    "Bancos",
+    "nav.entities.zonas":     "Zonas",
+    "nav.entities.otros":     "Otros",
+    "nav.entities.list":      "Lista",
+    "nav.entities.create":    "Crear",
     "nav.receptores.list": "Lista",
     "nav.receptores.create": "Crear",
+
+    // Contabilidad
+    "nav.contabilidad": "CONTABILIDAD",
+    "nav.contabilidad.gastos": "Gastos",
+    "nav.contabilidad.compras": "Compras",
+    "nav.contabilidad.rentas": "Rentas",
+    "nav.contabilidad.empleados": "Empleados",
+    "nav.contabilidad.inversion": "Inversion",
+    "nav.contabilidad.resumen": "Resumen General",
+
+    // Cobradores
+    "nav.cobradores": "COBRADORES",
+
+    // Prestamos
+    "nav.prestamos": "PRESTAMOS",
+    "nav.prestamos.lista": "Lista de Prestamos",
+    "nav.prestamos.nuevo": "Nuevo Prestamo",
+    "nav.prestamos.abonos": "Abonos",
+    "nav.prestamos.cobros": "Cobros",
 
     // Header
     "header.changePassword": "Cambiar contrasena",
@@ -205,7 +334,7 @@ export const translations = {
     "nav.sales.percentages": "Percentages",
     "nav.sales.pools": "Pools",
     "nav.sales.zones": "Zones",
-    "nav.tickets.create": "Create",
+    "nav.tickets.create":  "Create",
     "nav.tickets.monitor": "Monitor",
     "nav.tickets.plays": "Plays",
     "nav.tickets.winners": "Winning Plays",
@@ -235,15 +364,56 @@ export const translations = {
     "nav.limits.list": "List",
     "nav.limits.create": "Create",
     "nav.limits.automatic": "Automatic Limits",
+    "nav.limits.delete": "Delete",
+    "nav.limits.numeros": "Number Limits",
+    "nav.limits.limitacion": "Number Limitation",
+    "nav.movil": "MOBILE",
+    "nav.movil.crear-cliente": "Create Client",
+    "nav.movil.clientes": "Client List",
+    "nav.movil.retiro": "Withdrawal",
+    "nav.movil.recargas": "Recharges",
+    "nav.movil.cancelar": "Cancel Recharge",
+    "nav.movil.tickets": "Tickets",
+    "nav.movil.premios": "Prizes",
+    "nav.movil.reporte": "View Report",
     "nav.sorteos.list": "List",
     "nav.sorteos.schedule": "Schedule",
     "nav.zones.list": "List",
     "nav.zones.create": "Create",
     "nav.zones.manage": "Manage",
-    "nav.entities.list": "List",
-    "nav.entities.create": "Create",
+    "nav.entities.bancas":    "Pools",
+    "nav.entities.empleados": "Employees",
+    "nav.entities.bancos":    "Banks",
+    "nav.entities.zonas":     "Zones",
+    "nav.entities.otros":     "Others",
+    "nav.entities.list":      "List",
+    "nav.entities.create":    "Create",
     "nav.receptores.list": "List",
     "nav.receptores.create": "Create",
+
+    // Contabilidad
+    "nav.contabilidad": "ACCOUNTING",
+    "nav.contabilidad.gastos": "Expenses",
+    "nav.contabilidad.compras": "Purchases",
+    "nav.contabilidad.rentas": "Rent",
+    "nav.contabilidad.empleados": "Employees",
+    "nav.contabilidad.inversion": "Investment",
+    "nav.contabilidad.resumen": "General Summary",
+
+    // Cobradores
+    "nav.cobradores": "COLLECTORS",
+
+    // Prestamos
+    "nav.prestamos": "LOANS",
+    "nav.prestamos.lista": "Loan List",
+    "nav.prestamos.nuevo": "New Loan",
+    "nav.prestamos.abonos": "Payments",
+    "nav.prestamos.cobros": "Collections",
+
+    // SuperAdmin
+    "nav.superadmin": "ADMIN",
+    "nav.superadmin.panel": "PANEL ADMIN",
+    "nav.log": "ACTIVITY LOG",
 
     // Header
     "header.changePassword": "Change Password",
@@ -290,7 +460,9 @@ export type TranslationKey = keyof (typeof translations)["es"];
 
 // ─── Store ──────────────────────────────────────────────────────────────────────
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
   // ── Initial State ────────────────────────────────────────────────────────────
   user: null,
   isAuthenticated: false,
@@ -298,8 +470,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   sidebarExpanded: true,
-  expandedGroups: {
-    ventas: false,
+  sidebarPinned: false,
+    expandedGroups: {
+      cobradores: false,
+      ventas: false,
     tickets: false,
     bancas: false,
     balances: false,
@@ -317,6 +491,47 @@ export const useAuthStore = create<AuthState>((set) => ({
   notifications: [],
   unreadNotifications: 0,
 
+  // ── Banca Permissions (loaded from localStorage) ────────────────────────────
+  bancaPermissions: loadPerms(),
+  permissionsLog: loadLog(),
+
+  getBancaPerms: (bancaId: string): BancaPerms => {
+    const stored = loadPerms()[bancaId];
+    return stored ?? defaultPerms();
+  },
+
+  setBancaPermission: (bancaId, bancaName, permKey, value) =>
+    set((state) => {
+      const current = state.bancaPermissions[bancaId] ?? defaultPerms();
+      const updated: BancaPermissions = {
+        ...state.bancaPermissions,
+        [bancaId]: { ...current, [permKey]: value },
+      };
+      savePerms(updated);
+
+      const entry: PermLogEntry = {
+        id: `log-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        timestamp: new Date().toISOString(),
+        bancaId,
+        bancaName,
+        permKey,
+        permLabel: BANCA_PERM_LABELS[permKey],
+        value,
+        adminUser: state.user?.username ?? "admin",
+      };
+      const newLog = [entry, ...state.permissionsLog];
+      saveLog(newLog);
+
+      return { bancaPermissions: updated, permissionsLog: newLog };
+    }),
+
+  resetBancaPerms: (bancaId) =>
+    set((state) => {
+      const updated = { ...state.bancaPermissions, [bancaId]: defaultPerms() };
+      savePerms(updated);
+      return { bancaPermissions: updated };
+    }),
+
   // ── Auth Actions ─────────────────────────────────────────────────────────────
 
   login: async (username: string, password: string) => {
@@ -328,7 +543,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     const found = adminUsers.find(
       (u) =>
         u.username.toLowerCase() === username.toLowerCase() &&
-        password.length > 0 // Accept any non-empty password
+        u.password === password
     );
 
     if (found) {
@@ -364,6 +579,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   toggleSidebar: () =>
     set((state) => ({ sidebarExpanded: !state.sidebarExpanded })),
+
+  toggleSidebarPin: () =>
+    set((state) => ({
+      sidebarPinned: !state.sidebarPinned,
+      sidebarExpanded: !state.sidebarPinned ? true : state.sidebarExpanded,
+    })),
 
   toggleGroup: (groupKey: string) =>
     set((state) => {
@@ -419,7 +640,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   clearNotifications: () =>
     set({ notifications: [], unreadNotifications: 0 }),
-}));
+  }),
+  {
+    name: "nmv-auth-storage",
+    partialize: (state) => ({
+      user: state.user,
+      isAuthenticated: state.isAuthenticated,
+      language: state.language,
+    }),
+  }
+));
 
 // ─── Helper Hook ────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,26 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Check } from "lucide-react";
-import { bettingPools, zones } from "@/data/mockData";
+import { Send, Check, ChevronDown } from "lucide-react";
+// ─── Datos locales NMV (no depende de mockData) ───────────────────────────────
+const bettingPools = [
+  {id:"b01",name:"NMV RD 01",code:"NMV-0001",isActive:true},
+  {id:"b02",name:"NMV RD 02",code:"NMV-0002",isActive:true},
+  {id:"b03",name:"NMV RD 03",code:"NMV-0003",isActive:true},
+  {id:"b04",name:"NMV RD 04",code:"NMV-0004",isActive:true},
+  {id:"b05",name:"NMV RD 05",code:"NMV-0005",isActive:true},
+  {id:"b06",name:"NMV RD 06",code:"NMV-0006",isActive:true},
+  {id:"b07",name:"NMV RD 07",code:"NMV-0007",isActive:true},
+  {id:"b08",name:"NMV RD 08",code:"NMV-0008",isActive:true},
+  {id:"b09",name:"NMV RD 09",code:"NMV-0009",isActive:true},
+  {id:"b10",name:"NMV RD 10",code:"NMV-0010",isActive:true},
+  {id:"b11",name:"NMV RD 11",code:"NMV-0011",isActive:true},
+  {id:"b12",name:"NMV RD 12",code:"NMV-0012",isActive:true},
+  {id:"b13",name:"NMV RD 13",code:"NMV-0013",isActive:true},
+];
+const zones = [
+  {id:"z1",name:"Default",code:"ZON-0001"},
+  {id:"z2",name:"SFM",code:"ZON-0002"},
+];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,9 +165,7 @@ export default function Notificaciones() {
                       ? "Seleccionar bancas..."
                       : `${selectedPools.length} banca(s)`}
                 </span>
-                <span className="text-xs text-[#999999]">
-                  {isAllPoolsSelected ? "&#9662;" : "&#9662;"}
-                </span>
+                <ChevronDown size={14} className="text-[#999999]"/>
               </button>
               {/* Pool checkboxes */}
               <div className="mt-2 max-h-[200px] overflow-y-auto border border-[#F0F0EB] rounded-lg p-2 space-y-1">
@@ -198,7 +215,7 @@ export default function Notificaciones() {
                       ? "Seleccionar zonas..."
                       : `${selectedZones.length} zona(s)`}
                 </span>
-                <span className="text-xs text-[#999999]">&#9662;</span>
+                <ChevronDown size={14} className="text-[#999999]"/>
               </button>
               <div className="mt-2 max-h-[120px] overflow-y-auto border border-[#F0F0EB] rounded-lg p-2 space-y-1">
                 <label className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#F5F5F0] cursor-pointer text-sm">

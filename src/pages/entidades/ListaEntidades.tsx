@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Settings, Plus } from "lucide-react";
+import { Search, Plus, X, Pencil, Save, Loader2 } from "lucide-react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import { bettingPools, zones } from "@/data/mockData";
-import type { BettingPool } from "@/data/mockData";
+import { useBancasStore } from "@/store/bancasStore";
+import { useZonasStore } from "@/store/zonasStore";
+// ─── Local type alias (compatible con datos de Supabase) ──────────────────────
+interface BettingPool { id:string; name:string; code:string; mwrCode:string; balance:number; isActive:boolean; }
 
 // ─── Additional Entity Types ──────────────────────────────────────────────────
 
@@ -37,35 +39,16 @@ interface OtherEntity {
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
-const employees: Employee[] = [
-  { id: "emp-001", name: "Juan Perez", code: "EMP-0001", balance: 25000.0, caidaAcumulada: 0.0, prestamo: 5000.0 },
-  { id: "emp-002", name: "Maria Garcia", code: "EMP-0002", balance: 15000.0, caidaAcumulada: 1200.0, prestamo: 0.0 },
-  { id: "emp-003", name: "Carlos Lopez", code: "EMP-0003", balance: -3500.0, caidaAcumulada: 3500.0, prestamo: 2000.0 },
-  { id: "emp-004", name: "Ana Martinez", code: "EMP-0004", balance: 42000.0, caidaAcumulada: 0.0, prestamo: 0.0 },
-  { id: "emp-005", name: "Luis Rodriguez", code: "EMP-0005", balance: 8900.0, caidaAcumulada: 500.0, prestamo: 1000.0 },
+const employees: Employee[] = [];
+
+const banks: Bank[] = [];
+
+const zoneEntities = [
+  {id:"z1", name:"Default", code:"ZON-0001", balance:110000, caidaAcumulada:0, prestamo:0},
+  {id:"z2", name:"SFM",     code:"ZON-0002", balance:20000,  caidaAcumulada:0, prestamo:0},
 ];
 
-const banks: Bank[] = [
-  { id: "bank-01", name: "Banco Popular", code: "BNK-0001", balance: 1250000.0, caidaAcumulada: 0.0, prestamo: 0.0 },
-  { id: "bank-02", name: "Banco BHD", code: "BNK-0002", balance: -233415.0, caidaAcumulada: 15000.0, prestamo: 50000.0 },
-  { id: "bank-03", name: "Banco Reservas", code: "BNK-0003", balance: 450000.0, caidaAcumulada: 0.0, prestamo: 0.0 },
-  { id: "bank-04", name: "ScotiaBank", code: "BNK-0004", balance: 78000.0, caidaAcumulada: 2000.0, prestamo: 15000.0 },
-];
-
-const zoneEntities = zones.map((z) => ({
-  id: z.id,
-  name: z.name,
-  code: `ZON-${z.id.split("-")[1].padStart(4, "0")}`,
-  balance: z.bettingPoolCount * 10000,
-  caidaAcumulada: 0.0,
-  prestamo: 0.0,
-}));
-
-const others: OtherEntity[] = [
-  { id: "oth-001", name: "Caja General", code: "CJA-0001", balance: 500000.0, caidaAcumulada: 0.0, prestamo: 0.0 },
-  { id: "oth-002", name: "Gastos Operativos", code: "GST-0001", balance: -45000.0, caidaAcumulada: 0.0, prestamo: 0.0 },
-  { id: "oth-003", name: "Impuestos", code: "IMP-0001", balance: -12500.0, caidaAcumulada: 0.0, prestamo: 0.0 },
-];
+const others: OtherEntity[] = [];
 
 const tabs = ["Bancas", "Empleados", "Bancos", "Zonas", "Otros"] as const;
 type TabType = (typeof tabs)[number];
@@ -84,10 +67,120 @@ function formatCurrency(value: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+type CrearForm = {nombre:string; codigo:string; tipo:TabType; balance:string;};
+
+function CrearEntidadModal({activeTab,onClose}:{activeTab:TabType;onClose:()=>void}){
+  const [form,setForm]=useState<CrearForm>({nombre:"",codigo:"",tipo:activeTab,balance:"0"});
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState("");
+  const { createBanca } = useBancasStore();
+  const { createZona }  = useZonasStore();
+
+  const handleCrear = async () => {
+    if (!form.nombre.trim()) return;
+    setLoading(true); setErr("");
+    let result: {ok:boolean;error?:string};
+    if (form.tipo === "Bancas") {
+      result = await createBanca({ nombre:form.nombre.trim(), codigo:form.codigo.trim(), mwr_code:form.codigo.trim(), balance:parseFloat(form.balance)||0, is_active:true, zona_id:null, notas:"" });
+    } else if (form.tipo === "Zonas") {
+      result = await createZona({ nombre:form.nombre.trim(), descripcion:"", is_active:true });
+    } else {
+      result = { ok:true }; // other types → TODO
+    }
+    setLoading(false);
+    if (!result.ok) { setErr(result.error ?? "Error al guardar"); return; }
+    onClose();
+  };
+
+  return(
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.95}} transition={{duration:0.15}}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-[#333]">Crear Entidad</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={16} className="text-[#666]"/></button>
+        </div>
+        <div className="space-y-3">
+          <div><label className="text-xs text-[#999] font-medium">Tipo de entidad</label>
+            <select value={form.tipo} onChange={e=>setForm(p=>({...p,tipo:e.target.value as TabType}))}
+              className="w-full mt-1 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4] bg-white">
+              {(["Bancas","Empleados","Bancos","Zonas","Otros"] as TabType[]).map(t=><option key={t} value={t}>{t}</option>)}
+            </select></div>
+          <div><label className="text-xs text-[#999] font-medium">Nombre *</label>
+            <input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Nombre de la entidad"
+              className="w-full mt-1 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
+          {form.tipo==="Bancas" && <div><label className="text-xs text-[#999] font-medium">Código</label>
+            <input value={form.codigo} onChange={e=>setForm(p=>({...p,codigo:e.target.value}))} placeholder="Ej: RDV-R01"
+              className="w-full mt-1 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>}
+          {form.tipo==="Bancas" && <div><label className="text-xs text-[#999] font-medium">Balance inicial (RD$)</label>
+            <input type="number" value={form.balance} onChange={e=>setForm(p=>({...p,balance:e.target.value}))}
+              className="w-full mt-1 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>}
+          {err && <p className="text-xs text-red-500 font-medium">{err}</p>}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-[#E5E5E0] rounded-xl hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleCrear} disabled={!form.nombre.trim()||loading}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${form.nombre.trim()&&!loading?"bg-[#4ECDC4] text-white hover:bg-[#3DBDB5]":"bg-[#E5E5E0] text-[#999] cursor-not-allowed"}`}>
+            {loading?<Loader2 size={14} className="animate-spin"/>:null}
+            {loading?"Guardando...":"Crear Entidad"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function ListaEntidades() {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>("Bancas");
+  const location = useLocation();
+  const tabFromPath: Record<string, TabType> = {
+    "/accountable-entities/bancas":    "Bancas",
+    "/accountable-entities/empleados": "Empleados",
+    "/accountable-entities/bancos":    "Bancos",
+    "/accountable-entities/zonas":     "Zonas",
+    "/accountable-entities/otros":     "Otros",
+  };
+  const initialTab: TabType = tabFromPath[location.pathname] ?? "Bancas";
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [filter, setFilter] = useState("");
+  const [showCrearModal, setShowCrearModal] = useState(false);
+  const [editingPool, setEditingPool] = useState<BettingPool | null>(null);
+  const [editForm, setEditForm] = useState<BettingPool | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // ─── Supabase stores ─────────────────────────────────────────────────────────
+  const { bancas, fetchBancas, createBanca, updateBanca } = useBancasStore();
+  const { zonas, fetchZonas } = useZonasStore();
+
+  useEffect(() => {
+    fetchBancas();
+    fetchZonas();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Map Banca (Supabase) → BettingPool (display format)
+  const bettingPools: BettingPool[] = bancas.map(b => ({
+    id: b.id,
+    name: b.nombre,
+    code: b.codigo,
+    mwrCode: b.mwr_code,
+    balance: b.balance,
+    isActive: b.is_active,
+  }));
+
+  // Map Zonas (Supabase) → zoneEntities format
+  const zoneRows = zonas.map(z => ({
+    id: z.id,
+    name: z.nombre,
+    code: z.id.slice(0, 8).toUpperCase(),
+    balance: 0,
+    caidaAcumulada: 0,
+    prestamo: 0,
+  }));
+
+  useEffect(() => {
+    const t = tabFromPath[location.pathname];
+    if (t) setActiveTab(t);
+  }, [location.pathname]);
 
   // ─── Filter Logic ───────────────────────────────────────────────────────────
 
@@ -101,10 +194,10 @@ export default function ListaEntidades() {
     );
   };
 
-  const filteredPools = useMemo(() => filterByText(bettingPools), [filter]);
+  const filteredPools = useMemo(() => filterByText(bettingPools), [filter, bettingPools]);
   const filteredEmployees = useMemo(() => filterByText(employees), [filter]);
   const filteredBanks = useMemo(() => filterByText(banks), [filter]);
-  const filteredZones = useMemo(() => filterByText(zoneEntities), [filter]);
+  const filteredZones = useMemo(() => filterByText(zoneRows), [filter, zoneRows]);
   const filteredOthers = useMemo(() => filterByText(others), [filter]);
 
   // ─── Balance Cell ───────────────────────────────────────────────────────────
@@ -121,14 +214,14 @@ export default function ListaEntidades() {
 
   // ─── Actions Cell ───────────────────────────────────────────────────────────
 
-  function ActionsCell() {
+  function ActionsCell({ entity }: { entity: BettingPool }) {
     return (
       <button
-        onClick={(e) => e.stopPropagation()}
-        className="p-1.5 rounded-lg text-[#999999] hover:text-[#4ECDC4] hover:bg-[rgba(78,205,196,0.1)] transition-colors"
-        title="Configuracion"
+        onClick={(e) => { e.stopPropagation(); setEditingPool(entity); setEditForm({ ...entity }); }}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[#4ECDC4] hover:bg-[rgba(78,205,196,0.1)] border border-[#4ECDC4]/30 hover:border-[#4ECDC4] transition-all"
+        title="Editar entidad"
       >
-        <Settings size={16} />
+        <Pencil size={13} /> Editar
       </button>
     );
   }
@@ -177,7 +270,7 @@ export default function ListaEntidades() {
       header: "Acciones",
       accessor: () => "",
       align: "center",
-      cell: () => <ActionsCell />,
+      cell: (row) => <ActionsCell entity={row} />,
     },
   ];
 
@@ -225,7 +318,11 @@ export default function ListaEntidades() {
       header: "Acciones",
       accessor: () => "",
       align: "center",
-      cell: () => <ActionsCell />,
+      cell: () => (
+        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[#4ECDC4] hover:bg-[rgba(78,205,196,0.1)] border border-[#4ECDC4]/30 hover:border-[#4ECDC4] transition-all">
+          <Pencil size={13}/> Editar
+        </button>
+      ),
     },
   ];
 
@@ -242,7 +339,7 @@ export default function ListaEntidades() {
           </p>
         </div>
         <button
-          onClick={() => navigate("/accountable-entities/new")}
+          onClick={() => setShowCrearModal(true)}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4ECDC4] text-white text-sm font-medium rounded-full hover:bg-[#3DBDB5] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_2px_8px_rgba(78,205,196,0.3)] hover:shadow-[0_4px_12px_rgba(78,205,196,0.4)]"
         >
           <Plus size={16} />
@@ -357,6 +454,61 @@ export default function ListaEntidades() {
           </AnimatePresence>
         </div>
       </motion.div>
+      <AnimatePresence>
+        {showCrearModal&&<CrearEntidadModal key="crear" activeTab={activeTab} onClose={()=>setShowCrearModal(false)}/>}
+      </AnimatePresence>
+
+      {/* ── Edit Modal ─────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {editingPool && editForm && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setEditingPool(null)}>
+            <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.95}} transition={{duration:0.15}}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e=>e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-[#333]">Editar Entidad</h3>
+                  <p className="text-xs text-[#999] mt-0.5">{editingPool.code}</p>
+                </div>
+                <button onClick={()=>setEditingPool(null)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={16} className="text-[#666]"/></button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-[#999] font-medium">Nombre</label>
+                  <input value={editForm.name} onChange={e=>setEditForm(f=>f?{...f,name:e.target.value}:f)}
+                    className="w-full mt-1 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+                </div>
+                <div>
+                  <label className="text-xs text-[#999] font-medium">Código MWR</label>
+                  <input value={editForm.mwrCode} onChange={e=>setEditForm(f=>f?{...f,mwrCode:e.target.value}:f)}
+                    className="w-full mt-1 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+                </div>
+                <div>
+                  <label className="text-xs text-[#999] font-medium">Balance (RD$)</label>
+                  <input type="number" value={editForm.balance} onChange={e=>setEditForm(f=>f?{...f,balance:Number(e.target.value)}:f)}
+                    className="w-full mt-1 px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-[#999] font-medium">Estado</label>
+                  <button onClick={()=>setEditForm(f=>f?{...f,isActive:!f.isActive}:f)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${editForm.isActive?"bg-green-100 text-green-700":"bg-red-100 text-red-600"}`}>
+                    {editForm.isActive?"Activo":"Inactivo"}
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={()=>setEditingPool(null)} className="flex-1 px-4 py-2 text-sm border border-[#E5E5E0] rounded-xl hover:bg-gray-50">Cancelar</button>
+                <button onClick={()=>{
+                  // TODO: persist to Supabase vendors table
+                  Object.assign(editingPool, editForm); // update in-place for now
+                  setEditingPool(null);
+                }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-[#4ECDC4] text-white hover:bg-[#3DBDB5]">
+                  <Save size={13}/> Guardar Cambios
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

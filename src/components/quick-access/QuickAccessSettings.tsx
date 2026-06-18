@@ -100,16 +100,16 @@ export default function QuickAccessSettings() {
       </AnimatePresence>
 
       {/* Grid of Toggle Items */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
         {DEFAULT_AVAILABLE_ITEMS.map((item) => {
           const isActive = activeIds.includes(item.id);
           return (
             <motion.button
               key={item.id}
               onClick={() => toggleItem(item.id)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all cursor-pointer ${
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                 isActive
                   ? "border-[#4ECDC4] bg-[#E8F8F5]"
                   : "border-[#E5E5E0] bg-white hover:border-[#CCCCCC]"
@@ -117,32 +117,21 @@ export default function QuickAccessSettings() {
             >
               {/* Icon */}
               <div
-                className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                   isActive ? "bg-[#4ECDC4]" : "bg-[#E5E5E0]"
                 }`}
               >
-                <SettingsIcon
-                  iconName={item.icon}
-                  size={18}
-                />
+                <SettingsIcon iconName={item.icon} size={16} />
               </div>
 
-              {/* Label */}
-              <span
-                className={`text-sm font-medium flex-1 ${
-                  isActive ? "text-[#0F766E]" : "text-[#666666]"
-                }`}
-              >
+              {/* Label — always single line */}
+              <span className={`text-sm font-medium flex-1 truncate ${isActive ? "text-[#0F766E]" : "text-[#666666]"}`}>
                 {item.label}
               </span>
 
-              {/* Checkmark indicator */}
-              <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                  isActive ? "bg-[#4ECDC4]" : "bg-[#E5E5E0]"
-                }`}
-              >
-                {isActive && <Check size={12} className="text-white" />}
+              {/* Checkmark */}
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${isActive ? "bg-[#4ECDC4]" : "bg-[#E5E5E0]"}`}>
+                {isActive && <Check size={11} className="text-white" />}
               </div>
             </motion.button>
           );

@@ -16,47 +16,106 @@ const initialPrivileges: PrivilegeCategory[] = [
   {
     name: "Acceso al sistema",
     expanded: true,
-    privileges: ["Login", "Dashboard view", "Settings access", "Cambiar contrasena", "Ver ayuda"],
+    privileges: [
+      "ACCESO AL SISTEMA",
+      "DASHBOARD ADMINISTRATIVO",
+    ],
   },
   {
     name: "Transacciones",
     expanded: false,
-    privileges: ["Crear transaccion", "Ver transacciones", "Editar transaccion", "Eliminar transaccion", "Aprobar transaccion", "Exportar transacciones"],
+    privileges: [
+      "CREAR AJUSTES",
+      "CREAR CATEGORIAS DE GASTOS",
+      "CREAR COBROS",
+      "CREAR PAGOS",
+      "CREAR RETIROS",
+      "CREAR TRANSFERENCIAS",
+      "MANEJAR ENTIDADES CONTABLES",
+      "MANEJAR TRANSACCIONES",
+      "PAGOS Y COBROS (ACCESO RAPIDO)",
+      "TRANSACCIONES SIMPLIFICADAS",
+      "VER TODOS LOS GRUPOS DE TRANSACCIONES",
+    ],
   },
   {
     name: "Usuarios",
     expanded: false,
-    privileges: ["Crear usuario", "Ver usuarios", "Editar usuario", "Eliminar usuario", "Gestionar administradores", "Ver logs de sesion"],
+    privileges: [
+      "CAMBIAR CONTRASEÑAS DE ADMINISTRADORES",
+      "CAMBIAR CONTRASEÑAS DE BANCAS",
+      "ENVIAR NOTIFICACIONES",
+      "MANEJAR SEGURIDAD DEL GRUPO",
+      "MANEJAR USUARIOS",
+      "VER INICIOS DE SESION",
+      "VER INICIOS DE SESION ADMINISTRATIVOS",
+    ],
   },
   {
     name: "Bancas",
     expanded: false,
-    privileges: ["Crear banca", "Ver bancas", "Editar banca", "Eliminar banca", "Edicion masiva", "Control de acceso", "Limpiar pendientes"],
+    privileges: [
+      "ACCESAR RECARGAS TELEF",
+      "ACCESO DE BANCAS",
+      "CREAR BANCAS",
+      "EDITAR CAIDA ACUMULADA",
+      "MANEJAR BANCAS",
+      "VER BANCAS SIN VENTAS",
+    ],
   },
   {
     name: "Balances",
     expanded: false,
-    privileges: ["Ver balances de bancas", "Ver balances de bancos", "Exportar balances", "Ver reportes financieros"],
+    privileges: [
+      "BANCAS",
+      "BANCOS",
+      "VER REPORTE DE BANCA",
+    ],
   },
   {
     name: "Ventas",
     expanded: false,
-    privileges: ["Ver ventas del dia", "Ver ventas historico", "Ver ventas por fecha", "Ver ventas por zona", "Exportar ventas", "Ver premios por jugada"],
+    privileges: [
+      "PROCESAR TICKETS DE HOY",
+      "PROCESAR VENTAS DE AYER",
+      "VER VENTAS",
+    ],
   },
   {
     name: "Tickets",
     expanded: false,
-    privileges: ["Crear ticket", "Monitorear tickets", "Ver jugadas", "Ver ganadores", "Pizarra", "Ver anomalias", "Cancelar tickets"],
+    privileges: [
+      "CANCELAR TICKET",
+      "CANCELAR TICKETS EN CUALQUIER MOMENTO",
+      "LIMPIAR PENDIENTES DE PAGO",
+      "MARCAR CUALQUIER TICKET COMO PAGO",
+      "MONITOREO DE TICKETS",
+      "VENDER COMO CUALQUIER BANCA",
+      "VENDER FUERA DE HORARIO",
+      "VENDER TICKETS",
+      "VER ANOMALIAS",
+    ],
   },
   {
     name: "Otros",
     expanded: false,
-    privileges: ["Enviar notificaciones", "Gestionar receptores", "Entidades contables", "Configurar limites", "Ver resultados"],
+    privileges: [
+      "MANEJAR RECEPTORES DE CORREOS",
+      "MANEJAR ZONAS",
+    ],
   },
   {
     name: "Sorteos",
     expanded: false,
-    privileges: ["Gestionar resultados", "Ver horarios", "Editar loterias", "Configurar sorteos", "Ver logs de sorteos"],
+    privileges: [
+      "MANEJAR HORARIO DE SORTEOS",
+      "MANEJAR LIMITE DE BANCAS",
+      "MANEJAR LIMITES",
+      "MANEJAR SORTEOS",
+      "PUBLICAR RESULTADOS DE DIAS PASADOS",
+      "PUBLICAR RESULTADOS DE HOY",
+      "VER RESULTADOS",
+    ],
   },
 ];
 
@@ -245,6 +304,7 @@ export default function CrearUsuario() {
                           animate={{ opacity: 1 }}
                           transition={{ duration: 0.2 }}
                           className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FAFAF8] cursor-pointer"
+                          onClick={() => setCheckedPrivileges(prev => { const next = new Set(prev); if(next.has(priv)) next.delete(priv); else next.add(priv); return next; })}
                         >
                           <div
                             className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${

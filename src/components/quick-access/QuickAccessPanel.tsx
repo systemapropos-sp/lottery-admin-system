@@ -145,7 +145,7 @@ export default function QuickAccessPanel() {
                   Configurelos desde la pagina de Configuracion.
                 </div>
               ) : (
-                <div className="grid grid-cols-4 sm:grid-cols-8 gap-4">
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
                   {activeItems.map((item, index) => (
                     <motion.button
                       key={item.id}
@@ -154,20 +154,20 @@ export default function QuickAccessPanel() {
                       initial="hidden"
                       animate="visible"
                       whileHover={{
-                        scale: 1.03,
+                        scale: 1.05,
                         borderColor: "#4ECDC4",
                         boxShadow: "0 4px 16px rgba(78,205,196,0.15)",
                       }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleNavigate(item.route)}
-                      className="flex flex-col items-center gap-2 p-3 bg-white border border-[#E5E5E0] rounded-xl transition-colors cursor-pointer aspect-square justify-center"
+                      className="flex flex-col items-center gap-2 px-2 py-4 bg-white border border-[#E5E5E0] rounded-xl transition-colors cursor-pointer min-h-[96px] justify-center overflow-visible"
                     >
                       {/* Icon container */}
-                      <div className="w-12 h-12 rounded-xl bg-[#E8F8F5] flex items-center justify-center flex-shrink-0">
-                        <QuickAccessIcon item={item} size={24} />
+                      <div className="w-11 h-11 rounded-xl bg-[#E8F8F5] flex items-center justify-center flex-shrink-0">
+                        <QuickAccessIcon item={item} size={22} />
                       </div>
-                      {/* Label */}
-                      <span className="text-xs text-[#333333] text-center leading-tight line-clamp-2 font-medium">
+                      {/* Label — always fully visible */}
+                      <span className="text-[10px] font-semibold text-[#444] text-center leading-snug w-full px-1 break-words">
                         {item.label}
                       </span>
                     </motion.button>

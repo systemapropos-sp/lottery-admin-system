@@ -1,278 +1,177 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Check, Calendar } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Calendar, CheckCircle2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { lotteries } from "@/data/mockData";
+
+const NMV_SORTEOS = [
+  "ANGUILA 10AM","LA PRIMERA","LOTEDOM","LA SUERTE","KING LOTTERY AM","QUINIELA REAL",
+  "ANGUILA 1PM","SUPER PALE REAL-GANA MAS","GANA MAS","SUPER PALE NY-GANA MAS",
+  "FLORIDA AM","NEW YORK AM","ANGUILA 6PM","LA SUERTE 6:00PM","KING LOTTERY PM",
+  "LOTEKA","LA PRIMERA 7PM","NACIONAL","QUINIELA PALE","SUPER PALE NACIONAL-QP",
+  "SUPER PALE NY-NACIONAL","ANGUILA 9PM","FLORIDA PM","NEW YORK PM",
+];
+const DIAS = [
+  {key:"monday",label:"LUNES"},{key:"tuesday",label:"MARTES"},{key:"wednesday",label:"MIÉRCOLES"},
+  {key:"thursday",label:"JUEVES"},{key:"friday",label:"VIERNES"},{key:"saturday",label:"SÁBADO"},
+  {key:"sunday",label:"DOMINGO"},
+];
+const TIPOS_LIMITE = ["General para grupo","General por banca","Por sorteo","Por zona"];
 
 interface MontoState {
-  directo: string;
-  pale: string;
-  tripleta: string;
-  cash3Straight: string;
-  cash3Box: string;
-  play4Straight: string;
-  play4Box: string;
-  superPale: string;
-  bolita1: string;
-  bolita2: string;
-  singulacion1: string;
-  singulacion2: string;
-  singulacion3: string;
-  pick5Straight: string;
-  pick5Box: string;
-  cash3FrontStraight: string;
-  cash3BackStraight: string;
-  cash3FrontBox: string;
-  cash3BackBox: string;
-  pickTwoFront: string;
-  pickTwoBack: string;
-  pickTwoMiddle: string;
+  directo:string; pale:string; tripleta:string; cash3Straight:string; cash3Box:string;
+  play4Straight:string; play4Box:string; superPale:string; bolita1:string; bolita2:string;
+  singulacion1:string; singulacion2:string; singulacion3:string; pick5Straight:string;
+  pick5Box:string; cash3FrontStraight:string; cash3BackStraight:string;
+  cash3FrontBox:string; cash3BackBox:string; pickTwoFront:string;
+  pickTwoBack:string; pickTwoMiddle:string;
 }
-
-const DIAS = [
-  { key: "monday", label: "Lun" },
-  { key: "tuesday", label: "Mar" },
-  { key: "wednesday", label: "Mie" },
-  { key: "thursday", label: "Jue" },
-  { key: "friday", label: "Vie" },
-  { key: "saturday", label: "Sab" },
-  { key: "sunday", label: "Dom" },
+const MONTOS_FIELDS: {key:keyof MontoState;label:string}[] = [
+  {key:"directo",label:"Directo"},{key:"pale",label:"Pale"},{key:"tripleta",label:"Tripleta"},
+  {key:"cash3Straight",label:"Cash3 Straight"},{key:"cash3Box",label:"Cash3 Box"},
+  {key:"play4Straight",label:"Play4 Straight"},{key:"play4Box",label:"Play4 Box"},
+  {key:"superPale",label:"Super Pale"},{key:"bolita1",label:"Bolita 1"},
+  {key:"bolita2",label:"Bolita 2"},{key:"singulacion1",label:"Singulación 1"},
+  {key:"singulacion2",label:"Singulación 2"},{key:"singulacion3",label:"Singulación 3"},
+  {key:"pick5Straight",label:"Pick5 Straight"},{key:"pick5Box",label:"Pick5 Box"},
+  {key:"cash3FrontStraight",label:"Cash3 Front Straight"},{key:"cash3BackStraight",label:"Cash3 Back Straight"},
+  {key:"cash3FrontBox",label:"Cash3 Front Box"},{key:"cash3BackBox",label:"Cash3 Back Box"},
+  {key:"pickTwoFront",label:"Pick Two Front"},{key:"pickTwoBack",label:"Pick Two Back"},
+  {key:"pickTwoMiddle",label:"Pick Two Middle"},
 ];
-
-const initialMontos: MontoState = {
-  directo: "", pale: "", tripleta: "",
-  cash3Straight: "", cash3Box: "", play4Straight: "", play4Box: "",
-  superPale: "", bolita1: "", bolita2: "",
-  singulacion1: "", singulacion2: "", singulacion3: "",
-  pick5Straight: "", pick5Box: "",
-  cash3FrontStraight: "", cash3BackStraight: "", cash3FrontBox: "", cash3BackBox: "",
-  pickTwoFront: "", pickTwoBack: "", pickTwoMiddle: "",
-};
+const initMontos: MontoState = Object.fromEntries(MONTOS_FIELDS.map(f=>[f.key,""])) as unknown as MontoState;
 
 export default function CrearLimite() {
-  const [tipoLimite, setTipoLimite] = useState("");
-  const [fechaExpiracion, setFechaExpiracion] = useState("");
-  const [selectedSorteos, setSelectedSorteos] = useState<Set<string>>(new Set());
-  const [montos, setMontos] = useState<MontoState>(initialMontos);
-  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
-  const [submitted, setSubmitted] = useState(false);
+  const [tipoLimite,setTipoLimite] = useState("");
+  const [fechaExpiracion,setFechaExpiracion] = useState("");
+  const [selectedSorteos,setSelectedSorteos] = useState<Set<string>>(new Set());
+  const [montos,setMontos] = useState<MontoState>(initMontos);
+  const [selectedDias,setSelectedDias] = useState<Set<string>>(new Set());
+  const [submitted,setSubmitted] = useState(false);
 
-  function toggleSorteo(id: string) {
-    setSelectedSorteos((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  function toggleSorteo(s:string){
+    setSelectedSorteos(p=>{const n=new Set(p);n.has(s)?n.delete(s):n.add(s);return n;});
   }
-
-  function toggleDay(key: string) {
-    setSelectedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  function toggleDia(k:string){
+    setSelectedDias(p=>{const n=new Set(p);n.has(k)?n.delete(k):n.add(k);return n;});
   }
+  function selectAllDias(){setSelectedDias(selectedDias.size===DIAS.length?new Set():new Set(DIAS.map(d=>d.key)));}
+  function selectAllSorteos(){setSelectedSorteos(selectedSorteos.size===NMV_SORTEOS.length?new Set():new Set(NMV_SORTEOS));}
 
-  function toggleAllDays() {
-    if (selectedDays.size === DIAS.length) {
-      setSelectedDays(new Set());
-    } else {
-      setSelectedDays(new Set(DIAS.map((d) => d.key)));
-    }
-  }
-
-  function handleMontoChange(key: keyof MontoState, value: string) {
-    setMontos((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e:React.FormEvent){
     e.preventDefault();
     setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 2000);
+    setTimeout(()=>{setSubmitted(false);setTipoLimite("");setFechaExpiracion("");setSelectedSorteos(new Set());setMontos(initMontos);setSelectedDias(new Set());},3000);
   }
 
-  const montoField = (label: string, key: keyof MontoState) => (
-    <div key={key} className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-[#666666]">{label}</label>
-      <input
-        type="number"
-        value={montos[key]}
-        onChange={(e) => handleMontoChange(key, e.target.value)}
-        placeholder="0.00"
-        className="w-full px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors"
-      />
-    </div>
-  );
+  const inputCls="w-full px-2.5 py-2 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 transition-all font-mono";
 
   return (
     <div className="min-h-[100dvh] p-6">
-      <PageHeader title="Crear Limite" subtitle="Configurar un nuevo limite de apuestas" />
+      <PageHeader title="Crear límites" subtitle="Configurar un nuevo límite de apuestas"/>
+      <AnimatePresence>
+        {submitted&&(
+          <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
+            className="mb-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-emerald-500"/>
+            <p className="text-sm font-semibold text-emerald-700">¡Límite creado exitosamente!</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <motion.form
-        onSubmit={handleSubmit}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="max-w-[900px] space-y-6"
-      >
-        {/* Tipo y Fecha */}
-        <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <motion.form onSubmit={handleSubmit} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.25}}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+        {/* LEFT — Límites */}
+        <div className="bg-white rounded-2xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6 space-y-5">
+          <h2 className="text-xs font-bold tracking-[0.14em] text-[#333] uppercase pb-3 border-b border-[#F0F0EB]">LÍMITES</h2>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Tipo de Limite *</label>
-              <select
-                value={tipoLimite}
-                onChange={(e) => setTipoLimite(e.target.value)}
-                required
-                className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors"
-              >
+            <div>
+              <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Tipo de Límite</label>
+              <select value={tipoLimite} onChange={e=>setTipoLimite(e.target.value)} required
+                className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-xl bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 transition-all">
                 <option value="">Seleccionar tipo</option>
-                <option value="numero">Por numero</option>
-                <option value="linea">Por linea</option>
-                <option value="banca">Por banca</option>
+                {TIPOS_LIMITE.map(t=><option key={t}>{t}</option>)}
               </select>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Fecha de expiracion</label>
+            <div>
+              <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Fecha de expiración</label>
               <div className="relative">
-                <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999] pointer-events-none" />
-                <input
-                  type="date"
-                  value={fechaExpiracion}
-                  onChange={(e) => setFechaExpiracion(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors"
-                />
+                <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AAA] pointer-events-none"/>
+                <input type="date" value={fechaExpiracion} onChange={e=>setFechaExpiracion(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-[#E5E5E0] rounded-xl bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 transition-all"/>
               </div>
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-2">Sorteos</label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {NMV_SORTEOS.map(s=>{
+                const active=selectedSorteos.has(s);
+                return(
+                  <button key={s} type="button" onClick={()=>toggleSorteo(s)}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                      active?"bg-[#4ECDC4] border-[#4ECDC4] text-white shadow-sm"
+                            :"bg-white border-[#D0D0CB] text-[#555] hover:border-[#4ECDC4] hover:text-[#4ECDC4]"
+                    }`}>
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" onClick={selectAllSorteos}
+              className="px-4 py-1.5 rounded-full text-xs font-bold border border-[#4ECDC4] text-[#4ECDC4] hover:bg-[#4ECDC4] hover:text-white transition-all">
+              {selectedSorteos.size===NMV_SORTEOS.length?"DESELECCIONAR TODOS":"SELECCIONAR TODOS"}
+            </button>
+            {selectedSorteos.size>0&&<p className="text-xs text-[#4ECDC4] font-medium mt-2">{selectedSorteos.size} sorteo(s) seleccionado(s)</p>}
+          </div>
         </div>
 
-        {/* Sorteos Grid */}
-        <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <h3 className="text-base font-semibold text-[#333333] mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#4ECDC4]" />
-            SORTEOS
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {lotteries.map((lot) => (
-              <motion.button
-                key={lot.id}
-                type="button"
-                onClick={() => toggleSorteo(lot.id)}
-                whileTap={{ scale: 0.97 }}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
-                  selectedSorteos.has(lot.id)
-                    ? "border-[#4ECDC4] bg-[#F0F8F7] shadow-sm"
-                    : "border-[#E5E5E0] bg-white hover:bg-[#FAFAF8]"
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                    selectedSorteos.has(lot.id) ? "bg-[#4ECDC4] border-[#4ECDC4]" : "border-[#CCCCCC]"
-                  }`}
-                >
-                  {selectedSorteos.has(lot.id) && <Check size={12} className="text-white" />}
-                </div>
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lot.color }} />
-                <span className="text-sm text-[#333333]">{lot.name}</span>
-              </motion.button>
+        {/* RIGHT — Monto + Días + Crear */}
+        <div className="bg-white rounded-2xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6 space-y-5">
+          <h2 className="text-xs font-bold tracking-[0.14em] text-[#333] uppercase pb-3 border-b border-[#F0F0EB]">MONTO</h2>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            {MONTOS_FIELDS.map(f=>(
+              <div key={f.key}>
+                <label className="block text-[10px] font-semibold text-[#666] mb-1 leading-tight">{f.label}</label>
+                <input type="number" value={montos[f.key]}
+                  onChange={e=>setMontos(m=>({...m,[f.key]:e.target.value}))}
+                  placeholder="0" className={inputCls}/>
+              </div>
             ))}
           </div>
-          <div className="mt-3 text-xs text-[#999999]">
-            {selectedSorteos.size} de {lotteries.length} sorteos seleccionados
-          </div>
-        </div>
 
-        {/* Montos Grid */}
-        <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <h3 className="text-base font-semibold text-[#333333] mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#FFD93D]" />
-            MONTOS MAXIMOS
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {montoField("Directo", "directo")}
-            {montoField("Pale", "pale")}
-            {montoField("Tripleta", "tripleta")}
-            {montoField("Cash3 S", "cash3Straight")}
-            {montoField("Cash3 B", "cash3Box")}
-            {montoField("Play4 S", "play4Straight")}
-            {montoField("Play4 B", "play4Box")}
-            {montoField("Super Pale", "superPale")}
-            {montoField("Bolita 1", "bolita1")}
-            {montoField("Bolita 2", "bolita2")}
-            {montoField("Singulacion 1", "singulacion1")}
-            {montoField("Singulacion 2", "singulacion2")}
-            {montoField("Singulacion 3", "singulacion3")}
-            {montoField("Pick5 S", "pick5Straight")}
-            {montoField("Pick5 B", "pick5Box")}
-            {montoField("Cash3 Front S", "cash3FrontStraight")}
-            {montoField("Cash3 Back S", "cash3BackStraight")}
-            {montoField("Cash3 Front B", "cash3FrontBox")}
-            {montoField("Cash3 Back B", "cash3BackBox")}
-            {montoField("Pick Two F", "pickTwoFront")}
-            {montoField("Pick Two B", "pickTwoBack")}
-            {montoField("Pick Two M", "pickTwoMiddle")}
+          <div className="border-t border-[#F0F0EB] pt-5">
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-2">Día de semana</label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {DIAS.map(d=>{
+                const active=selectedDias.has(d.key);
+                return(
+                  <button key={d.key} type="button" onClick={()=>toggleDia(d.key)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      active?"bg-[#4ECDC4] border-[#4ECDC4] text-white"
+                            :"bg-white border-[#D0D0CB] text-[#555] hover:border-[#4ECDC4] hover:text-[#4ECDC4]"
+                    }`}>
+                    {d.label}
+                  </button>
+                );
+              })}
+              <button type="button" onClick={selectAllDias}
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold border border-[#4ECDC4] text-[#4ECDC4] hover:bg-[#4ECDC4] hover:text-white transition-all">
+                SELECCIONAR TODOS
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Dias */}
-        <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <h3 className="text-base font-semibold text-[#333333] mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#96CEB4]" />
-            DIAS DE LA SEMANA
-          </h3>
-          <div className="flex flex-wrap gap-3 mb-3">
-            {DIAS.map((dia) => (
-              <motion.button
-                key={dia.key}
-                type="button"
-                onClick={() => toggleDay(dia.key)}
-                whileTap={{ scale: 0.95 }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                  selectedDays.has(dia.key)
-                    ? "border-[#4ECDC4] bg-[#F0F8F7] text-[#333333]"
-                    : "border-[#E5E5E0] bg-white text-[#666666] hover:bg-[#FAFAF8]"
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                    selectedDays.has(dia.key) ? "bg-[#4ECDC4] border-[#4ECDC4]" : "border-[#CCCCCC]"
-                  }`}
-                >
-                  {selectedDays.has(dia.key) && <Check size={10} className="text-white" />}
-                </div>
-                {dia.label}
-              </motion.button>
-            ))}
+          <div className="flex justify-end pt-2">
+            <button type="submit"
+              className="px-8 py-3 text-sm font-bold text-white rounded-xl transition-all shadow-[0_2px_10px_rgba(78,205,196,0.35)] hover:shadow-[0_4px_16px_rgba(78,205,196,0.45)] hover:scale-[1.02] active:scale-[0.98]"
+              style={{background:"linear-gradient(135deg,#4ECDC4,#0EA5E9)"}}>
+              CREAR
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={toggleAllDays}
-            className="text-sm text-[#4ECDC4] hover:text-[#3DBDB5] font-medium transition-colors"
-          >
-            {selectedDays.size === DIAS.length ? "Deseleccionar todos" : "Seleccionar todos"}
-          </button>
-        </div>
-
-        {/* Submit */}
-        <div className="flex items-center justify-end gap-3">
-          {submitted && (
-            <motion.span
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="text-sm text-[#22C55E] font-medium"
-            >
-              Limite creado exitosamente!
-            </motion.span>
-          )}
-          <button
-            type="submit"
-            className="px-8 py-2.5 text-sm font-medium text-white bg-[#4ECDC4] rounded-full hover:bg-[#3DBDB5] hover:shadow-[0_2px_8px_rgba(78,205,196,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
-          >
-            CREAR
-          </button>
         </div>
       </motion.form>
     </div>

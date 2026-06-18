@@ -1,429 +1,489 @@
-import { useState, useMemo, useCallback } from "react";
+/**
+ * F8 — Monitor de Tickets
+ * Concepto: JRM Monitor de tickets, diseño NMV moderno
+ */
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  RefreshCw,
-  Eye,
-  Calendar,
-  Search,
-  Filter,
+  Calendar, ChevronDown, ChevronUp, Printer, SlidersHorizontal,
+  Search, RotateCcw, TrendingUp, DollarSign, Clock,
 } from "lucide-react";
-import PageHeader from "@/components/ui/PageHeader";
-import { bettingPools, lotteries } from "@/data/mockData";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Datos locales ────────────────────────────────────────────────────────────
 
-interface MonitorEntry {
-  id: string;
-  bancaName: string;
-  monto: number;
+const NMV_BANCAS_LIST = [
+  {id:"b01",code:"NMV-0001",name:"NMV RD 01"},
+  {id:"b02",code:"NMV-0002",name:"NMV RD 02"},
+  {id:"b03",code:"NMV-0003",name:"NMV RD 03"},
+  {id:"b04",code:"NMV-0004",name:"NMV RD 04"},
+  {id:"b05",code:"NMV-0005",name:"NMV RD 05"},
+  {id:"b06",code:"NMV-0006",name:"NMV RD 06"},
+  {id:"b07",code:"NMV-0007",name:"NMV RD 07"},
+  {id:"b08",code:"NMV-0008",name:"NMV RD 08"},
+  {id:"b09",code:"NMV-0009",name:"NMV RD 09"},
+  {id:"b10",code:"NMV-0010",name:"NMV RD 10"},
+  {id:"b11",code:"NMV-0011",name:"NMV RD 11"},
+  {id:"b12",code:"NMV-0012",name:"NMV RD 12"},
+  {id:"b13",code:"NMV-0013",name:"NMV RD 13"},
+];
+const NMV_LOTERIAS = [
+  "Florida AM","Florida PM","New York AM","New York PM",
+  "Anguila 10AM","Anguila PM","Nacional","Leidsa","King Lottery",
+];
+const TIPOS_JUGADA = ["Directo","Pale","Tripleta","Super Pale","Quiniela"];
+const ZONAS = ["Default","SFM"];
+
+interface Ticket {
+  id:string; numero:string; fecha:string; usuario:string; banca:string;
+  loteria:string; tipoJugada:string; numeroJugado:string;
+  monto:number; premio:number;
+  fechaCancelacion:string|null; canceladoPor:string|null;
+  estado:"ganador"|"pendiente"|"perdedor"|"cancelado"|"pagado";
+  zona:string;
 }
 
-type QuickFilterType = "todos" | "top10" | "gt100" | "gt500" | "gt1000";
-
-// ─── Mock Monitor Data ────────────────────────────────────────────────────────
-
-function generateMonitorData(): MonitorEntry[] {
-  const data: MonitorEntry[] = [
-    { id: "m-001", bancaName: "MATADOR-SPORT", monto: 3200.0 },
-    { id: "m-002", bancaName: "MMW RD 02", monto: 2850.0 },
-    { id: "m-003", bancaName: "MMW RD 05", monto: 1500.0 },
-    { id: "m-004", bancaName: "MMW RD 01", monto: 1200.0 },
-    { id: "m-005", bancaName: "MMW RD 07", monto: 980.0 },
-    { id: "m-006", bancaName: "MMW RD 03", monto: 750.0 },
-    { id: "m-007", bancaName: "MMW RD 09", monto: 620.0 },
-    { id: "m-008", bancaName: "MMW RD 04", monto: 450.0 },
-    { id: "m-009", bancaName: "MMW RD 11", monto: 320.0 },
-    { id: "m-010", bancaName: "MMW RD 06", monto: 280.0 },
-    { id: "m-011", bancaName: "MMW RD 08", monto: 150.0 },
-    { id: "m-012", bancaName: "MMW RD 10", monto: 120.0 },
-    { id: "m-013", bancaName: "MMW RD 13", monto: 85.0 },
-    { id: "m-014", bancaName: "MMW RD 14", monto: 50.0 },
-    { id: "m-015", bancaName: "MMW RD 15", monto: 25.0 },
-    { id: "m-016", bancaName: "MMW RD 12", monto: 10.0 },
-    { id: "m-017", bancaName: "MMW RD 16", monto: 0.0 },
-    { id: "m-018", bancaName: "MMW RD 17", monto: 0.0 },
-    { id: "m-019", bancaName: "MMW RD 18", monto: 0.0 },
-    { id: "m-020", bancaName: "MMW RD 19", monto: 0.0 },
-    { id: "m-021", bancaName: "MMW RD 20", monto: 0.0 },
-  ];
-  // Add some inactive pool names from bettingPools
-  return data.map((d, i) => ({
-    ...d,
-    bancaName:
-      bettingPools[i]?.name || d.bancaName,
-  }));
-}
-
-const allMonitorData = generateMonitorData();
-
-const quickFilterOptions: { key: QuickFilterType; label: string }[] = [
-  { key: "todos", label: "Todos" },
-  { key: "top10", label: "Top 10" },
-  { key: "gt100", label: ">$100" },
-  { key: "gt500", label: ">$500" },
-  { key: "gt1000", label: ">$1000" },
+const DEMO: Ticket[] = [
+  {id:"t1",numero:"NMV-001-000066387",fecha:"06/18/2026 09:32 AM",usuario:"mr01",banca:"NMV-0001",loteria:"Anguila 10AM",tipoJugada:"Directo",numeroJugado:"03",monto:1040,premio:1600,fechaCancelacion:null,canceladoPor:null,estado:"pagado",zona:"Default"},
+  {id:"t2",numero:"NMV-001-000066360",fecha:"06/18/2026 09:12 AM",usuario:"mr01",banca:"NMV-0001",loteria:"Anguila 10AM",tipoJugada:"Directo",numeroJugado:"03",monto:565,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"perdedor",zona:"Default"},
+  {id:"t3",numero:"NMV-001-000066359",fecha:"06/18/2026 09:11 AM",usuario:"mr01",banca:"NMV-0001",loteria:"Anguila 10AM",tipoJugada:"Directo",numeroJugado:"03",monto:490,premio:0,fechaCancelacion:"06/18/2026 09:12 AM",canceladoPor:"mr01",estado:"cancelado",zona:"Default"},
+  {id:"t4",numero:"NMV-002-000045231",fecha:"06/18/2026 10:00 AM",usuario:"user02",banca:"NMV-0002",loteria:"Florida AM",tipoJugada:"Pale",numeroJugado:"12-34",monto:750,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"perdedor",zona:"Default"},
+  {id:"t5",numero:"NMV-002-000045240",fecha:"06/18/2026 10:15 AM",usuario:"user02",banca:"NMV-0002",loteria:"Florida PM",tipoJugada:"Directo",numeroJugado:"07",monto:300,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"pendiente",zona:"Default"},
+  {id:"t6",numero:"NMV-008-000031100",fecha:"06/18/2026 08:45 AM",usuario:"sfmuser",banca:"NMV-0008",loteria:"New York AM",tipoJugada:"Tripleta",numeroJugado:"22-55-77",monto:200,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"perdedor",zona:"SFM"},
+  {id:"t7",numero:"NMV-008-000031101",fecha:"06/18/2026 08:50 AM",usuario:"sfmuser",banca:"NMV-0008",loteria:"Nacional",tipoJugada:"Directo",numeroJugado:"31",monto:1500,premio:4500,fechaCancelacion:null,canceladoPor:null,estado:"ganador",zona:"SFM"},
 ];
 
-// ─── Format currency ──────────────────────────────────────────────────────────
-
-function formatCurrency(value: number): string {
-  return `$${value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+// ─── Toggle Switch ─────────────────────────────────────────────────────────────
+function Toggle({checked,onChange,label}:{checked:boolean;onChange:(v:boolean)=>void;label:string}) {
+  return (
+    <label className="flex items-center gap-2.5 cursor-pointer select-none group">
+      <button type="button" onClick={()=>onChange(!checked)}
+        className={`relative w-11 h-6 rounded-full transition-all duration-300 flex-shrink-0 ${
+          checked ? "bg-[#4ECDC4] shadow-[0_0_8px_rgba(78,205,196,0.4)]" : "bg-[#E0E0E0]"
+        }`}>
+        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
+          checked ? "left-5" : "left-0.5"
+        }`}/>
+      </button>
+      <span className="text-xs font-medium text-[#555] group-hover:text-[#333] transition-colors">{label}</span>
+    </label>
+  );
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
-export default function F8Monitoreo() {
-  const [fecha, setFecha] = useState<string>(
-    new Date().toISOString().split("T")[0]
+// ─── Bancas Multi-Select ──────────────────────────────────────────────────────
+function BancasSelect({selected,onChange}:{selected:string[];onChange:(v:string[])=>void}) {
+  const [open,setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node))setOpen(false);};
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[]);
+  const all = selected.length===NMV_BANCAS_LIST.length;
+  const label = selected.length===0?"Todas las bancas":all?"Todas":
+    selected.length<=2?selected.map(id=>NMV_BANCAS_LIST.find(b=>b.id===id)?.code??"").join(", "):`${selected.length} bancas`;
+  const toggle=(id:string)=>onChange(selected.includes(id)?selected.filter(s=>s!==id):[...selected,id]);
+  return(
+    <div ref={ref} className="relative">
+      <button type="button" onClick={()=>setOpen(v=>!v)}
+        className={`flex items-center justify-between gap-2 px-3 py-2.5 text-sm border rounded-xl bg-white transition-all min-w-[180px] ${
+          open||selected.length>0?"border-[#4ECDC4] ring-2 ring-[#4ECDC4]/15":"border-[#E5E5E0] hover:border-[#CCCCCC]"
+        }`}>
+        <span className={`truncate ${selected.length>0?"text-[#333] font-medium":"text-[#999]"}`}>{label}</span>
+        <ChevronDown size={13} className={`text-[#999] flex-shrink-0 transition-transform ${open?"rotate-180":""}`}/>
+      </button>
+      <AnimatePresence>
+        {open&&(
+          <motion.div initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}}
+            transition={{duration:0.15}}
+            className="absolute top-full mt-1.5 left-0 z-20 bg-white border border-[#E5E5E0] rounded-xl shadow-xl p-2 min-w-[220px] max-h-64 overflow-y-auto">
+            <label className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm border-b border-[#F0F0EB] mb-1">
+              <input type="checkbox" checked={all}
+                onChange={()=>onChange(all?[]:NMV_BANCAS_LIST.map(b=>b.id))}
+                className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
+              <span className="font-semibold text-[#333]">Todas las bancas</span>
+            </label>
+            {NMV_BANCAS_LIST.map(b=>(
+              <label key={b.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm transition-colors">
+                <input type="checkbox" checked={selected.includes(b.id)} onChange={()=>toggle(b.id)}
+                  className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
+                <span className="text-[#333]">{b.name}</span>
+                <span className="text-[#AAA] text-xs ml-auto font-mono">{b.code}</span>
+              </label>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
-  const [selectedSorteos, setSelectedSorteos] = useState<string[]>([]);
-  const [jugada, setJugada] = useState("");
-  const [quickFilter, setQuickFilter] = useState<QuickFilterType>("todos");
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [sortBy, setSortBy] = useState<"monto" | "banca">("monto");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+}
 
-  // Refresh handler
-  const handleRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 1000);
-  }, []);
+// ─── Zonas Multi-Select ────────────────────────────────────────────────────────
+function ZonasSelect({selected,onChange}:{selected:string[];onChange:(v:string[])=>void}) {
+  const [open,setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node))setOpen(false);};
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[]);
+  const all = selected.length===ZONAS.length;
+  const label = selected.length===0?"Todas las zonas":all?"Todas":`${selected.length} zona(s)`;
+  const toggle=(z:string)=>onChange(selected.includes(z)?selected.filter(s=>s!==z):[...selected,z]);
+  return(
+    <div ref={ref} className="relative">
+      <button type="button" onClick={()=>setOpen(v=>!v)}
+        className={`flex items-center justify-between gap-2 px-3 py-2.5 text-sm border rounded-xl bg-white transition-all min-w-[160px] ${
+          open||selected.length>0?"border-[#4ECDC4] ring-2 ring-[#4ECDC4]/15":"border-[#E5E5E0] hover:border-[#CCCCCC]"
+        }`}>
+        <span className={`truncate ${selected.length>0?"text-[#333] font-medium":"text-[#999]"}`}>{label}</span>
+        <ChevronDown size={13} className={`text-[#999] flex-shrink-0 transition-transform ${open?"rotate-180":""}`}/>
+      </button>
+      <AnimatePresence>
+        {open&&(
+          <motion.div initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}}
+            transition={{duration:0.15}}
+            className="absolute top-full mt-1.5 left-0 z-20 bg-white border border-[#E5E5E0] rounded-xl shadow-xl p-2 min-w-[160px]">
+            {ZONAS.map(z=>(
+              <label key={z} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm transition-colors">
+                <input type="checkbox" checked={selected.includes(z)} onChange={()=>toggle(z)}
+                  className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
+                <span className="text-[#333]">{z}</span>
+              </label>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
-  // Sort toggle
-  function toggleSort(column: "monto" | "banca") {
-    if (sortBy === column) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortBy(column);
-      setSortDir("desc");
+// ─── Estado Badge ───────────────────────────────────────────────────────────────
+function EstadoBadge({estado}:{estado:Ticket["estado"]}) {
+  const cfg:{[k:string]:{label:string;cls:string}} = {
+    ganador: {label:"Ganador",   cls:"bg-emerald-50 text-emerald-700 border-emerald-200"},
+    pagado:  {label:"Pagado",    cls:"bg-blue-50 text-blue-700 border-blue-200"},
+    pendiente:{label:"Pendiente",cls:"bg-amber-50 text-amber-700 border-amber-200"},
+    perdedor:{label:"Perdedor",  cls:"bg-slate-100 text-slate-600 border-slate-200"},
+    cancelado:{label:"Cancelado",cls:"bg-red-50 text-red-600 border-red-200"},
+  };
+  const c=cfg[estado]??cfg.perdedor;
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${c.cls}`}>{c.label}</span>;
+}
+
+// ─── Summary Card ───────────────────────────────────────────────────────────────
+function SummaryCard({icon,label,value,color,bg}:{icon:React.ReactNode;label:string;value:string;color:string;bg:string}) {
+  return(
+    <div className={`rounded-2xl p-4 ${bg} border border-white/60 flex items-center gap-3`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color} bg-white/70 flex-shrink-0 shadow-sm`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-xs font-medium text-[#666] uppercase tracking-wide">{label}</p>
+        <p className={`text-xl font-bold font-mono ${color} mt-0.5`}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+type SortField = "numero"|"fecha"|"usuario"|"monto"|"premio"|"estado";
+
+// ─── Main Component ─────────────────────────────────────────────────────────────
+export default function F8Monitoreo() {
+  const today = new Date().toISOString().slice(0,10);
+  const [fecha,setFecha] = useState(today);
+  const [bancas,setBancas] = useState<string[]>([]);
+  const [loteria,setLoteria] = useState("");
+  const [tipo,setTipo] = useState("");
+  const [numero,setNumero] = useState("");
+  const [pendientes,setPendientes] = useState(false);
+  const [soloGanadores,setSoloGanadores] = useState(false);
+  const [zonas,setZonas] = useState<string[]>([]);
+  const [applied,setApplied] = useState(false);
+  const [activeTab,setActiveTab] = useState<"todos"|"ganador"|"pendiente"|"perdedor"|"cancelado">("todos");
+  const [quickFilter,setQuickFilter] = useState("");
+  const [sortField,setSortField] = useState<SortField|null>(null);
+  const [sortDir,setSortDir] = useState<"asc"|"desc">("asc");
+
+  // ─ Filtered by apply
+  const filtered = useMemo(()=>{
+    let list = DEMO;
+    if(applied){
+      if(bancas.length) list=list.filter(t=>{
+        return bancas.some(bid=>{
+          const b=NMV_BANCAS_LIST.find(x=>x.id===bid);
+          return b&&(t.banca===b.code||t.banca===b.name);
+        });
+      });
+      if(loteria)      list=list.filter(t=>t.loteria===loteria);
+      if(tipo)         list=list.filter(t=>t.tipoJugada===tipo);
+      if(numero.trim())list=list.filter(t=>t.numeroJugado.includes(numero.trim()));
+      if(pendientes)   list=list.filter(t=>t.estado==="pendiente");
+      if(soloGanadores)list=list.filter(t=>t.estado==="ganador"||t.estado==="pagado");
+      if(zonas.length) list=list.filter(t=>zonas.includes(t.zona));
     }
+    return list;
+  },[applied,bancas,loteria,tipo,numero,pendientes,soloGanadores,zonas]);
+
+  const counts = useMemo(()=>{
+    const c={todos:filtered.length,ganador:0,pendiente:0,perdedor:0,cancelado:0};
+    filtered.forEach(t=>{
+      if(t.estado==="ganador"||t.estado==="pagado") c.ganador++;
+      else if(t.estado==="pendiente") c.pendiente++;
+      else if(t.estado==="perdedor")  c.perdedor++;
+      else if(t.estado==="cancelado") c.cancelado++;
+    });
+    return c;
+  },[filtered]);
+
+  // ─ Tab + quickfilter + sort
+  const displayed = useMemo(()=>{
+    let list = activeTab==="todos"?filtered:filtered.filter(t=>{
+      if(activeTab==="ganador") return t.estado==="ganador"||t.estado==="pagado";
+      return t.estado===activeTab;
+    });
+    if(quickFilter.trim()){
+      const q=quickFilter.toLowerCase();
+      list=list.filter(t=>t.numero.toLowerCase().includes(q)||t.usuario.toLowerCase().includes(q)||t.numeroJugado.includes(q));
+    }
+    if(sortField){
+      list=[...list].sort((a,b)=>{
+        let cmp=0;
+        if(sortField==="numero")  cmp=a.numero.localeCompare(b.numero);
+        if(sortField==="fecha")   cmp=a.fecha.localeCompare(b.fecha);
+        if(sortField==="usuario") cmp=a.usuario.localeCompare(b.usuario);
+        if(sortField==="monto")   cmp=a.monto-b.monto;
+        if(sortField==="premio")  cmp=a.premio-b.premio;
+        if(sortField==="estado")  cmp=a.estado.localeCompare(b.estado);
+        return sortDir==="asc"?cmp:-cmp;
+      });
+    }
+    return list;
+  },[filtered,activeTab,quickFilter,sortField,sortDir]);
+
+  const totals = useMemo(()=>({
+    monto:    displayed.reduce((s,t)=>s+t.monto,0),
+    premios:  displayed.reduce((s,t)=>s+t.premio,0),
+    pendiente:displayed.filter(t=>t.estado==="pendiente").reduce((s,t)=>s+t.monto,0),
+  }),[displayed]);
+
+  function toggleSort(f:SortField){
+    if(sortField===f) setSortDir(d=>d==="asc"?"desc":"asc");
+    else{setSortField(f);setSortDir("desc");}
   }
 
-  // Filtered & sorted data
-  const filteredData = useMemo(() => {
-    let data = [...allMonitorData];
+  function resetFilters(){
+    setBancas([]);setLoteria("");setTipo("");setNumero("");
+    setPendientes(false);setSoloGanadores(false);setZonas([]);
+    setApplied(false);setActiveTab("todos");setQuickFilter("");
+  }
 
-    // Quick filter
-    switch (quickFilter) {
-      case "top10":
-        data = data.sort((a, b) => b.monto - a.monto).slice(0, 10);
-        break;
-      case "gt100":
-        data = data.filter((d) => d.monto > 100);
-        break;
-      case "gt500":
-        data = data.filter((d) => d.monto > 500);
-        break;
-      case "gt1000":
-        data = data.filter((d) => d.monto > 1000);
-        break;
-      default:
-        break;
-    }
+  const fmt=(n:number)=>`$${n.toLocaleString("en-US",{minimumFractionDigits:2})}`;
 
-    // Jugada filter
-    if (jugada.trim()) {
-      data = data.filter((d) =>
-        d.bancaName.toLowerCase().includes(jugada.toLowerCase())
-      );
-    }
+  const TABS=[
+    {key:"todos",    label:"TODOS",     count:counts.todos},
+    {key:"ganador",  label:"GANADORES", count:counts.ganador},
+    {key:"pendiente",label:"PENDIENTES",count:counts.pendiente},
+    {key:"perdedor", label:"PERDEDORES",count:counts.perdedor},
+    {key:"cancelado",label:"CANCELADO", count:counts.cancelado},
+  ] as const;
 
-    // Sort
-    data.sort((a, b) => {
-      if (sortBy === "monto") {
-        return sortDir === "asc" ? a.monto - b.monto : b.monto - a.monto;
-      }
-      return sortDir === "asc"
-        ? a.bancaName.localeCompare(b.bancaName)
-        : b.bancaName.localeCompare(a.bancaName);
-    });
-
-    return data;
-  }, [quickFilter, jugada, sortBy, sortDir]);
-
-  const total = useMemo(
-    () => filteredData.reduce((sum, d) => sum + d.monto, 0),
-    [filteredData]
-  );
-
-  const maxMonto = useMemo(
-    () => Math.max(...filteredData.map((d) => d.monto), 1),
-    [filteredData]
-  );
+  function SortBtn({field,label}:{field:SortField;label:string}) {
+    const active=sortField===field;
+    return(
+      <button onClick={()=>toggleSort(field)} className={`flex items-center gap-0.5 transition-colors font-semibold ${active?"text-[#4ECDC4]":"hover:text-[#4ECDC4]"}`}>
+        {label}
+        <span className="ml-0.5">{active?(sortDir==="asc"?<ChevronUp size={11}/>:<ChevronDown size={11}/>):<ChevronUp size={9} className="opacity-20"/>}</span>
+      </button>
+    );
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.3,
-        ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
-      }}
-      className="space-y-6"
-    >
-      <PageHeader title="F8 - Monitoreo de jugadas por Banca" />
+    <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.35}} className="space-y-5">
 
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 space-y-4"
-      >
-        <div className="flex flex-wrap items-end gap-4">
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1A1A2E]">Monitor de Tickets</h1>
+          <p className="text-sm text-[#9999AA] mt-0.5">Supervisión y filtrado de tickets en tiempo real</p>
+        </div>
+        {applied && (
+          <button onClick={resetFilters}
+            className="flex items-center gap-1.5 text-xs text-[#999] hover:text-[#EF4444] transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50 border border-[#E5E5E0] hover:border-red-200">
+            <RotateCcw size={12}/> Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {/* ── Filter Card ─────────────────────────────────────────────── */}
+      <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{duration:0.35,delay:0.05}}
+        className="bg-white rounded-2xl border border-[#EBEBEB] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
+
+        {/* Row 1 */}
+        <div className="flex flex-wrap items-end gap-3 mb-4">
           {/* Fecha */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[#666666]">Fecha</label>
-            <div className="relative">
-              <Calendar
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999]"
-              />
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className="pl-9 pr-3 py-2.5 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Sorteos multi-select */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[#666666]">
-              Sorteos
-            </label>
-            <div className="relative">
-              <Filter
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999]"
-              />
-              <select
-                multiple={false}
-                value={selectedSorteos[0] || ""}
-                onChange={(e) =>
-                  setSelectedSorteos(e.target.value ? [e.target.value] : [])
-                }
-                className="pl-9 pr-8 py-2.5 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-all appearance-none bg-white min-w-[180px]"
-              >
-                <option value="">Todos los sorteos</option>
-                {lotteries.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Jugada input */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[#666666]">
-              Jugada
-            </label>
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999]"
-              />
-              <input
-                type="text"
-                placeholder="Numero..."
-                value={jugada}
-                onChange={(e) => setJugada(e.target.value)}
-                className="pl-9 pr-3 py-2.5 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-all w-32"
-              />
-            </div>
-          </div>
-
-          {/* Refrescar */}
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={handleRefresh}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#4ECDC4] text-white text-sm font-medium hover:bg-[#3DBDB5] transition-all shadow-[0_2px_8px_rgba(78,205,196,0.3)]"
-          >
-            <RefreshCw
-              size={15}
-              className={isRefreshing ? "animate-spin" : ""}
-            />
-            Refrescar
-          </motion.button>
-        </div>
-      </motion.div>
-
-      {/* Total */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2, duration: 0.4 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5"
-      >
-        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <p className="text-sm text-[#666666] mb-1">Total</p>
-            <motion.p
-              key={total}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-2xl font-bold text-[#333333] tabular-nums"
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {formatCurrency(total)}
-            </motion.p>
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Fecha</label>
+            <div className="relative">
+              <Calendar size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AAAAAA] pointer-events-none"/>
+              <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}
+                className="pl-8 pr-3 py-2.5 text-sm border border-[#E5E5E0] rounded-xl bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 w-40 transition-all"/>
+            </div>
           </div>
+          {/* Banca */}
+          <div>
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Banca</label>
+            <BancasSelect selected={bancas} onChange={setBancas}/>
+          </div>
+          {/* Lotería */}
+          <div>
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Lotería</label>
+            <select value={loteria} onChange={e=>setLoteria(e.target.value)}
+              className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-xl bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 w-44 transition-all">
+              <option value="">Todas</option>
+              {NMV_LOTERIAS.map(l=><option key={l}>{l}</option>)}
+            </select>
+          </div>
+          {/* Tipo jugada */}
+          <div>
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Tipo de jugada</label>
+            <select value={tipo} onChange={e=>setTipo(e.target.value)}
+              className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-xl bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 w-36 transition-all">
+              <option value="">Todos</option>
+              {TIPOS_JUGADA.map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+          {/* Número */}
+          <div>
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Número</label>
+            <input value={numero} onChange={e=>setNumero(e.target.value)} placeholder="Ej: 03"
+              className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-xl bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 w-28 transition-all"/>
+          </div>
+        </div>
 
-          {/* Quick filter chips */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Eye size={16} className="text-[#999999] mr-1" />
-            {quickFilterOptions.map((opt) => (
-              <button
-                key={opt.key}
-                onClick={() => setQuickFilter(opt.key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                  quickFilter === opt.key
-                    ? "bg-[#4ECDC4] text-white shadow-[0_2px_6px_rgba(78,205,196,0.3)]"
-                    : "bg-[#F5F5F0] text-[#666666] hover:bg-[#E8E8E3]"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+        {/* Row 2 */}
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <Toggle checked={pendientes} onChange={setPendientes} label="Pendientes de pago"/>
+          <Toggle checked={soloGanadores} onChange={setSoloGanadores} label="Sólo ganadores"/>
+          <div>
+            <ZonasSelect selected={zonas} onChange={setZonas}/>
           </div>
+          <button onClick={()=>setApplied(true)}
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#4ECDC4] text-white text-sm font-bold rounded-xl hover:bg-[#3DBDB5] active:scale-[0.97] transition-all shadow-[0_2px_10px_rgba(78,205,196,0.35)] hover:shadow-[0_4px_16px_rgba(78,205,196,0.4)]">
+            <SlidersHorizontal size={14}/> FILTRAR
+          </button>
+        </div>
+
+        {/* Status Tabs */}
+        <div className="flex flex-wrap gap-2 pt-4 border-t border-[#F0F0EB]">
+          <span className="text-xs text-[#AAAAAA] font-semibold uppercase tracking-wider self-center mr-1">Ver:</span>
+          {TABS.map(tab=>(
+            <button key={tab.key} onClick={()=>setActiveTab(tab.key)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                activeTab===tab.key
+                  ?"bg-[#4ECDC4] text-white shadow-[0_2px_8px_rgba(78,205,196,0.35)]"
+                  :"bg-[#F5F5F0] text-[#666] hover:bg-[#EBEBEB]"
+              }`}>
+              {tab.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                activeTab===tab.key?"bg-white/25 text-white":"bg-white/80 text-[#888]"
+              }`}>{tab.count}</span>
+            </button>
+          ))}
         </div>
       </motion.div>
 
-      {/* Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25, duration: 0.3 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden"
-      >
+      {/* ── Summary Cards ────────────────────────────────────────────── */}
+      <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.35,delay:0.1}}
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <SummaryCard icon={<DollarSign size={18}/>} label="Monto Total"
+          value={fmt(totals.monto)} color="text-[#4ECDC4]" bg="bg-gradient-to-br from-[#E0F7F5] to-[#CCF2EF]"/>
+        <SummaryCard icon={<TrendingUp size={18}/>} label="Total Premios"
+          value={fmt(totals.premios)} color="text-emerald-600" bg="bg-gradient-to-br from-emerald-50 to-green-50"/>
+        <SummaryCard icon={<Clock size={18}/>} label="Pendiente de Pago"
+          value={fmt(totals.pendiente)} color={totals.pendiente>0?"text-amber-600":"text-[#999]"} bg="bg-gradient-to-br from-amber-50 to-orange-50"/>
+      </motion.div>
+
+      {/* ── Table Card ───────────────────────────────────────────────── */}
+      <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.35,delay:0.15}}
+        className="bg-white rounded-2xl border border-[#EBEBEB] shadow-[0_2px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+
+        {/* Quick filter bar */}
+        <div className="px-5 py-3.5 border-b border-[#F5F5F0] flex items-center gap-3">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#BBBBBB] pointer-events-none"/>
+            <input value={quickFilter} onChange={e=>setQuickFilter(e.target.value)}
+              placeholder="Filtro rápido..."
+              className="pl-8 pr-3 py-2 text-sm border border-[#E5E5E0] rounded-xl focus:outline-none focus:border-[#4ECDC4] focus:ring-2 focus:ring-[#4ECDC4]/15 w-52 transition-all"/>
+          </div>
+          <span className="text-xs text-[#BBBBBB] ml-auto">
+            {displayed.length} ticket{displayed.length!==1?"s":""}
+          </span>
+        </div>
+
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#F8F8F5] text-[#666666] text-[13px] font-semibold uppercase tracking-[0.03em]">
-                <th
-                  className="px-4 py-3 text-left border-b border-[#E8E8E3] cursor-pointer select-none hover:text-[#333333] transition-colors"
-                  onClick={() => toggleSort("banca")}
-                >
-                  <div className="flex items-center gap-1">
-                    Banca
-                    {sortBy === "banca" && (
-                      <span className="text-[#4ECDC4]">
-                        {sortDir === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </div>
-                </th>
-                <th
-                  className="px-4 py-3 text-left border-b border-[#E8E8E3] cursor-pointer select-none hover:text-[#333333] transition-colors"
-                  onClick={() => toggleSort("monto")}
-                >
-                  <div className="flex items-center gap-1">
-                    Monto
-                    {sortBy === "monto" && (
-                      <span className="text-[#4ECDC4]">
-                        {sortDir === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left border-b border-[#E8E8E3] w-full">
-                  Distribucion
-                </th>
+              <tr className="bg-[#FAFAF8] border-b border-[#EFEFEB] text-[11px] text-[#888] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left font-semibold"><SortBtn field="numero" label="Número"/></th>
+                <th className="px-4 py-3 text-left font-semibold"><SortBtn field="fecha" label="Fecha"/></th>
+                <th className="px-4 py-3 text-left font-semibold"><SortBtn field="usuario" label="Usuario"/></th>
+                <th className="px-4 py-3 text-right font-semibold"><SortBtn field="monto" label="Monto"/></th>
+                <th className="px-4 py-3 text-right font-semibold"><SortBtn field="premio" label="Premio"/></th>
+                <th className="px-4 py-3 text-left font-semibold text-[#888]">Fecha Cancelación</th>
+                <th className="px-4 py-3 text-center font-semibold"><SortBtn field="estado" label="Estado"/></th>
+                <th className="px-4 py-3 text-center font-semibold text-[#888]">Acción</th>
               </tr>
             </thead>
             <tbody>
               <AnimatePresence>
-                {filteredData.map((entry, idx) => {
-                  const percentage =
-                    maxMonto > 0 ? (entry.monto / maxMonto) * 100 : 0;
-                  return (
-                    <motion.tr
-                      key={entry.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{
-                        delay: idx * 0.04,
-                        duration: 0.3,
-                        ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
-                      }}
-                      className={`border-b border-[#E8E8E3] transition-colors hover:bg-[#F0F8F7] ${
-                        idx % 2 === 0 ? "bg-white" : "bg-[#FAFAF8]"
-                      }`}
-                    >
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className="font-medium text-[#333333]">
-                          {entry.bancaName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span
-                          className="tabular-nums font-medium text-[#333333]"
-                          style={{ fontVariantNumeric: "tabular-nums" }}
-                        >
-                          {formatCurrency(entry.monto)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-4 bg-[#F0F0EB] rounded-full overflow-hidden min-w-[100px]">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${percentage}%` }}
-                              transition={{
-                                duration: 0.6,
-                                ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
-                                delay: idx * 0.05,
-                              }}
-                              className="h-full rounded-full"
-                              style={{
-                                background: `linear-gradient(90deg, #6FE3DC 0%, #4ECDC4 50%, #3DBDB5 100%)`,
-                              }}
-                            />
-                          </div>
-                          <span className="text-xs text-[#999999] tabular-nums w-12 text-right">
-                            {maxMonto > 0
-                              ? `${((entry.monto / total) * 100).toFixed(1)}%`
-                              : "0.0%"}
-                          </span>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
+                {displayed.length===0?(
+                  <tr>
+                    <td colSpan={8} className="py-16 text-center text-sm text-[#AAAAAA]">
+                      <div className="flex flex-col items-center gap-2">
+                        <Search size={28} className="text-[#E0E0E0]"/>
+                        <p>No se encontraron tickets</p>
+                      </div>
+                    </td>
+                  </tr>
+                ):displayed.map((t,ri)=>(
+                  <motion.tr key={t.id}
+                    initial={{opacity:0,y:4}} animate={{opacity:1,y:0}}
+                    transition={{duration:0.2,delay:ri*0.02}}
+                    className={`border-b border-[#F7F7F5] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#F0FBF9] transition-colors`}>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-[#4ECDC4] text-xs font-semibold cursor-pointer hover:underline hover:text-[#3DBDB5] transition-colors">{t.numero}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-[#666]">{t.fecha}</td>
+                    <td className="px-4 py-3 text-xs font-medium text-[#444]">{t.usuario}</td>
+                    <td className="px-4 py-3 text-right font-mono text-xs font-semibold text-[#333]">{fmt(t.monto)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      <span className={t.premio>0?"text-emerald-600 font-bold":"text-[#CCC]"}>{fmt(t.premio)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {t.fechaCancelacion
+                        ?<span className="text-red-500">{t.fechaCancelacion}{t.canceladoPor&&<span className="text-[#AAA] ml-1">({t.canceladoPor})</span>}</span>
+                        :<span className="text-[#DDD]">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center"><EstadoBadge estado={t.estado}/></td>
+                    <td className="px-4 py-3 text-center">
+                      <button className="p-2 rounded-xl text-[#4ECDC4] hover:bg-[#E0F7F5] hover:text-[#3DBDB5] transition-all" title="Imprimir ticket">
+                        <Printer size={14}/>
+                      </button>
+                    </td>
+                  </motion.tr>
+                ))}
               </AnimatePresence>
-
-              {filteredData.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={3}
-                    className="px-4 py-16 text-center text-[#999999]"
-                  >
-                    No hay datos para mostrar
-                  </td>
-                </tr>
-              )}
             </tbody>
-            {filteredData.length > 0 && (
-              <tfoot className="bg-[#F8F8F5] font-semibold text-[#333333] border-t-2 border-[#E8E8E3]">
-                <tr>
-                  <td className="px-4 py-3">TOTAL</td>
-                  <td
-                    className="px-4 py-3 tabular-nums"
-                    style={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {formatCurrency(total)}
-                  </td>
-                  <td className="px-4 py-3">100.0%</td>
-                </tr>
-              </tfoot>
-            )}
           </table>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 bg-[#FAFAFA] border-t border-[#F0F0EB] flex items-center justify-between">
+          <p className="text-xs text-[#AAAAAA]">
+            Mostrando <span className="font-semibold text-[#666]">{displayed.length}</span> ticket{displayed.length!==1?"s":""}
+          </p>
+          {applied && <span className="text-xs text-[#4ECDC4] font-medium bg-[#E0F7F5] px-2.5 py-1 rounded-full">Filtros activos</span>}
         </div>
       </motion.div>
     </motion.div>
