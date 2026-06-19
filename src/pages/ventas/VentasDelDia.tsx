@@ -1,32 +1,11 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, ChevronDown, Search, X } from "lucide-react";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
-// ─── Tipos compartidos ────────────────────────────────────────────────────────
+// --- Tipos compartidos --------------------------------------------------------
 const fmt = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-
-// ─── Datos estáticos (reemplazar con Supabase) ────────────────────────────────
-const BANCAS = [
-  { id: "b1", ref: "MATADOR-SPORT", codigo: "MWR-0001" },
-  { id: "b2", ref: "MMW RD 02",     codigo: "MWR-0002" },
-  { id: "b3", ref: "MMW RD 03",     codigo: "MWR-0003" },
-  { id: "b4", ref: "MMW RD 04",     codigo: "MWR-0004" },
-  { id: "b5", ref: "MMW RD 05",     codigo: "MWR-0005" },
-  { id: "b6", ref: "MMW RD 06",     codigo: "MWR-0006" },
-  { id: "b7", ref: "MMW RD 07",     codigo: "MWR-0007" },
-  { id: "b8", ref: "MMW RD 08",     codigo: "MWR-0008" },
-  { id: "b9", ref: "MMW RD 09",     codigo: "MWR-0009" },
-  { id: "b10", ref: "MMW RD 10",    codigo: "MWR-0010" },
-  { id: "b11", ref: "MMW RD 11",    codigo: "MWR-0011" },
-  { id: "b12", ref: "MMW RD 12",    codigo: "MWR-0012" },
-  { id: "b13", ref: "MMW RD 13",    codigo: "MWR-0013" },
-];
-
-const ZONAS = [
-  { id: "z1", nombre: "Default" },
-  { id: "z2", nombre: "SFM" },
-];
 
 const SORTEOS = [
   "LA PRIMERA 7PM","FLORIDA PM","LOTEKA","LA SUERTE","LA PRIMERA",
@@ -37,7 +16,7 @@ const SORTEOS = [
   "MEGA CHANCES","SUPER PALE PALE",
 ];
 
-// ─── Tipos de fila general ────────────────────────────────────────────────────
+// --- Tipos de fila general ----------------------------------------------------
 interface GeneralRow {
   id: string; ref: string; codigo: string;
   p: number; l: number; w: number; total: number;
@@ -45,14 +24,7 @@ interface GeneralRow {
   neto: number; final: number; balance: number;
 }
 
-const generalRows: GeneralRow[] = BANCAS.map((b) => ({
-  id: b.id, ref: b.ref, codigo: b.codigo,
-  p: 0, l: 0, w: 0, total: 0,
-  venta: 0, comisiones: 0, premios: 0,
-  neto: 0, final: 0, balance: 0,
-}));
-
-// ─── Pills de filtro ──────────────────────────────────────────────────────────
+// --- Pills de filtro ----------------------------------------------------------
 type FilterPill = "TODOS" | "CON VENTAS" | "CON PREMIOS" | "CON TICKETS PENDIENTES" | "CON VENTAS NETAS NEGATIVAS" | "CON VENTAS NETAS POSITIVAS";
 const PILLS: FilterPill[] = ["TODOS", "CON VENTAS", "CON PREMIOS", "CON TICKETS PENDIENTES", "CON VENTAS NETAS NEGATIVAS", "CON VENTAS NETAS POSITIVAS"];
 
@@ -67,7 +39,7 @@ function applyPill(rows: GeneralRow[], pill: FilterPill): GeneralRow[] {
   }
 }
 
-// ─── Helpers UI ───────────────────────────────────────────────────────────────
+// --- Helpers UI ---------------------------------------------------------------
 const netoCell = (n: number) => (
   <span className={`font-semibold ${n < 0 ? "text-[#EF4444]" : n > 0 ? "text-[#22C55E]" : "text-[#999]"}`}>{fmt(n)}</span>
 );
@@ -108,7 +80,7 @@ function ActionBtn({ label, variant = "primary", onClick }: { label: string; var
   );
 }
 
-// ─── MultiSelect dropdown con opciones reales ─────────────────────────────────
+// --- MultiSelect dropdown con opciones reales ---------------------------------
 function MultiSelect({ label, options, selected, onChange }: {
   label: string; options: string[]; selected: string[]; onChange: (s: string[]) => void;
 }) {
@@ -146,14 +118,14 @@ function MultiSelect({ label, options, selected, onChange }: {
   );
 }
 
-// ─── QuickFilter ──────────────────────────────────────────────────────────────
+// --- QuickFilter --------------------------------------------------------------
 function QuickFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex items-center gap-2">
       <div className="relative">
         <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#999]" />
         <input value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="Filtro rápido"
+          placeholder="Filtro r�pido"
           className="pl-7 pr-7 py-1.5 text-xs border border-[#E5E5E0] rounded-lg bg-[#FAFAFA] focus:outline-none focus:border-[#14B8A6] w-44 transition-colors" />
         {value && (
           <button onClick={() => onChange("")} className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -168,7 +140,7 @@ function QuickFilter({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
-// ─── FilterPills ──────────────────────────────────────────────────────────────
+// --- FilterPills --------------------------------------------------------------
 function FilterPills({ active, onChange }: { active: FilterPill; onChange: (p: FilterPill) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -182,8 +154,17 @@ function FilterPills({ active, onChange }: { active: FilterPill; onChange: (p: F
   );
 }
 
-// ─── TAB GENERAL ─────────────────────────────────────────────────────────────
+// --- TAB GENERAL -------------------------------------------------------------
 function TabGeneral() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name, codigo: b.code }));
+  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
+  const generalRows: GeneralRow[] = BANCAS.map((b) => ({
+    id: b.id, ref: b.ref, codigo: b.codigo,
+    p: 0, l: 0, w: 0, total: 0,
+    venta: 0, comisiones: 0, premios: 0,
+    neto: 0, final: 0, balance: 0,
+  }));
   const [date, setDate]       = useState(new Date().toISOString().slice(0, 10));
   const [pill, setPill]       = useState<FilterPill>("TODOS");
   const [subTab, setSubTab]   = useState<"bancas" | "resultados">("bancas");
@@ -242,7 +223,7 @@ function TabGeneral() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
-              {["Ref.","Código","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"].map((h) => (
+              {["Ref.","C�digo","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"].map((h) => (
                 <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555] whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -289,8 +270,11 @@ function TabGeneral() {
   );
 }
 
-// ─── TAB BANCA POR SORTEO ─────────────────────────────────────────────────────
+// --- TAB BANCA POR SORTEO -----------------------------------------------------
 function TabBancaPorSorteo() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name ?? "", codigo: b.code ?? "" }));
+  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
   const [fi, setFi] = useState(new Date().toISOString().slice(0, 10));
   const [ff, setFf] = useState(new Date().toISOString().slice(0, 10));
   const [selSorteos, setSelSorteos] = useState<string[]>(SORTEOS);
@@ -352,8 +336,10 @@ function TabBancaPorSorteo() {
   );
 }
 
-// ─── TAB POR SORTEO ───────────────────────────────────────────────────────────
+// --- TAB POR SORTEO -----------------------------------------------------------
 function TabPorSorteo() {
+  const { zonas: zonasRaw } = useBancasZonas();
+  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [selZonas, setSelZonas] = useState<string[]>(ZONAS.map((z) => z.nombre));
   const [quick, setQuick] = useState("");
@@ -404,8 +390,11 @@ function TabPorSorteo() {
   );
 }
 
-// ─── TAB COMBINACIONES ────────────────────────────────────────────────────────
+// --- TAB COMBINACIONES --------------------------------------------------------
 function TabCombinaciones() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name ?? "", codigo: b.code ?? "" }));
+  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
   const [date, setDate]         = useState(new Date().toISOString().slice(0, 10));
   const [selSorteos, setSelSorteos] = useState<string[]>(SORTEOS);
   const [selZonas, setSelZonas]     = useState<string[]>(ZONAS.map((z) => z.nombre));
@@ -433,7 +422,7 @@ function TabCombinaciones() {
       <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
         <table className="w-full text-sm">
           <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
-            {["Combinación","Total Vendido","Total comisiones","Total comisiones 2","Total premios","Balances"].map((h) => (
+            {["Combinaci�n","Total Vendido","Total comisiones","Total comisiones 2","Total premios","Balances"].map((h) => (
               <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555] text-left">{h}</th>
             ))}
           </tr></thead>
@@ -460,8 +449,10 @@ function TabCombinaciones() {
   );
 }
 
-// ─── TAB POR ZONA ─────────────────────────────────────────────────────────────
+// --- TAB POR ZONA -------------------------------------------------------------
 function TabPorZona() {
+  const { zonas: zonasRaw } = useBancasZonas();
+  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
   const [date, setDate]         = useState(new Date().toISOString().slice(0, 10));
   const [pill, setPill]         = useState<FilterPill>("TODOS");
   const [selZonas, setSelZonas] = useState<string[]>(ZONAS.map((z) => z.nombre));
@@ -517,7 +508,7 @@ function TabPorZona() {
   );
 }
 
-// ─── TAB CATEGORÍA DE PREMIOS ─────────────────────────────────────────────────
+// --- TAB CATEGOR�A DE PREMIOS -------------------------------------------------
 function TabCategPremios({ tipo }: { tipo: "directo" | "pale" }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [quick, setQuick] = useState("");
@@ -575,11 +566,20 @@ function TabCategPremios({ tipo }: { tipo: "directo" | "pale" }) {
   );
 }
 
-// ─── TABS BAR ─────────────────────────────────────────────────────────────────
-const TABS = ["General","Banca por sorteo","Por sorteo","Combinaciones","Por zona","Categoría de Premios","Categoría de Premios para Pale"] as const;
+// --- TABS BAR -----------------------------------------------------------------
+const TABS = ["General","Banca por sorteo","Por sorteo","Combinaciones","Por zona","Categor�a de Premios","Categor�a de Premios para Pale"] as const;
 type Tab = typeof TABS[number];
 
 export default function VentasDelDia() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name ?? "", codigo: b.code ?? "" }));
+  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
+  const generalRows: GeneralRow[] = BANCAS.map((b) => ({
+    id: b.id, ref: b.ref, codigo: b.codigo,
+    p: 0, l: 0, w: 0, total: 0,
+    venta: 0, comisiones: 0, premios: 0,
+    neto: 0, final: 0, balance: 0,
+  }));
   const [activeTab, setActiveTab] = useState<Tab>("General");
 
   return (
@@ -603,8 +603,8 @@ export default function VentasDelDia() {
           {activeTab==="Por sorteo"                     && <TabPorSorteo />}
           {activeTab==="Combinaciones"                  && <TabCombinaciones />}
           {activeTab==="Por zona"                       && <TabPorZona />}
-          {activeTab==="Categoría de Premios"           && <TabCategPremios tipo="directo" />}
-          {activeTab==="Categoría de Premios para Pale" && <TabCategPremios tipo="pale" />}
+          {activeTab==="Categor�a de Premios"           && <TabCategPremios tipo="directo" />}
+          {activeTab==="Categor�a de Premios para Pale" && <TabCategPremios tipo="pale" />}
         </motion.div>
       </AnimatePresence>
     </motion.div>

@@ -22,6 +22,7 @@ interface Transaccion {
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
+// Datos vacíos — se cargarán desde Supabase
 const mockData: Transaccion[] = [
   {id:"1", fecha:"2026-06-16",descripcion:"Alquiler oficina central",   categoria:"rentas",    subcategoria:"Arriendo",     monto:2500, tipo:"egreso", estado:"pagado",    referencia:"RNT-001"},
   {id:"2", fecha:"2026-06-15",descripcion:"Compra impresoras térmicas", categoria:"compras",   subcategoria:"Equipos",      monto:1200, tipo:"egreso", estado:"pagado",    referencia:"CMP-012"},
@@ -50,7 +51,7 @@ const mockData: Transaccion[] = [
   {id:"l3",fecha:"2026-06-10",descripcion:"Préstamo a MWR-0009 MMW RD 09",    categoria:"prestamos",subcategoria:"Efectivo",monto:3500,tipo:"egreso",estado:"pendiente",referencia:"PRE-L003"},
 ];
 
-const TRANSACTIONS: Transaccion[] = mockData;
+const TRANSACTIONS: Transaccion[] = []; // mockData limpiado — datos reales vendrán de Supabase
 
 // ─── Category Config ──────────────────────────────────────────────────────────
 

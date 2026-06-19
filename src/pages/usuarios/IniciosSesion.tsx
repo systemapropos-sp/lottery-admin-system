@@ -2,47 +2,29 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { bettingPools, adminUsers, zones } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
-// Generate login sessions for pools
-const poolSessions = bettingPools.map((bp, idx) => ({
-  id: `sess-pool-${bp.id}`,
-  banca: bp.name,
-  usuario: bp.code,
-  primeraWeb: idx % 3 === 0 ? "2024-05-15 08:00:00" : "2024-05-14 10:30:00",
-  ultimaWeb: "2024-05-15 18:45:00",
-  primeraCelular: idx % 4 === 0 ? "2024-05-15 09:15:00" : "",
-  ultimaCelular: idx % 4 === 0 ? "2024-05-15 17:30:00" : "",
-  primeraApp: idx % 5 === 0 ? "2024-05-15 08:30:00" : "",
-  ultimaApp: idx % 5 === 0 ? "2024-05-15 16:00:00" : "",
-  zoneId: bp.zoneId,
-}));
-
-// Generate login sessions for admins
-const adminSessions = adminUsers.map((u) => ({
-  id: `sess-admin-${u.id}`,
-  banca: "-",
-  usuario: u.username,
-  primeraWeb: new Date(u.lastLogin).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-  ultimaWeb: "2024-05-15 14:20:00",
-  primeraCelular: u.username === "mmwrduser" ? "2024-05-14 08:00:00" : "",
-  ultimaCelular: u.username === "mmwrduser" ? "2024-05-15 12:00:00" : "",
-  primeraApp: "",
-  ultimaApp: "",
-  zoneId: u.zoneId,
-}));
-
-// IP collision data
-const ipCollisions = [
-  { id: "collision-1", banca: "MATADOR-SPORT / MMW RD 02", usuario: "mr01 / mr02", ip: "192.168.1.100", primeraWeb: "2024-05-15 08:00:00", ultimaWeb: "2024-05-15 18:00:00", primeraCelular: "", ultimaCelular: "", primeraApp: "", ultimaApp: "", zoneId: "z-01" },
-  { id: "collision-2", banca: "MMW RD 05 / MMW RD 08", usuario: "mr05 / mr08", ip: "192.168.1.150", primeraWeb: "2024-05-15 09:30:00", ultimaWeb: "2024-05-15 17:00:00", primeraCelular: "", ultimaCelular: "", primeraApp: "", ultimaApp: "", zoneId: "z-01" },
-];
-
 export default function IniciosSesion() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+
+  // Sesiones reales — por ahora vacías (se llenará desde Supabase)
+  const poolSessions = bancasRaw.map(bp => ({
+    id: `sess-pool-${bp.id}`,
+    banca: bp.name,
+    usuario: bp.code,
+    primeraWeb: "", ultimaWeb: "",
+    primeraCelular: "", ultimaCelular: "",
+    primeraApp: "", ultimaApp: "",
+    zoneId: bp.zone_id ?? "",
+  }));
+
+  const adminSessions: typeof poolSessions = [];
+  const ipCollisions: { id: string; banca: string; usuario: string; ip: string; primeraWeb: string; ultimaWeb: string; primeraCelular: string; ultimaCelular: string; primeraApp: string; ultimaApp: string; zoneId: string }[] = [];
+
   const [activeTab, setActiveTab] = useState<"bancas" | "administradores" | "colision">("bancas");
-  const [fecha, setFecha] = useState("2024-05-15");
+  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [showZoneDropdown, setShowZoneDropdown] = useState(false);
 
@@ -116,7 +98,7 @@ export default function IniciosSesion() {
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute top-full left-0 mt-1 bg-white border border-[#E5E5E0] rounded-lg shadow-lg z-20 min-w-[160px] py-1"
               >
-                {zones.map((z) => (
+                {zonasRaw.map((z) => (
                   <label key={z.id} className="flex items-center gap-2 px-3 py-2 hover:bg-[#F5F5F0] cursor-pointer text-sm">
                     <input
                       type="checkbox"
@@ -127,7 +109,7 @@ export default function IniciosSesion() {
                       }}
                       className="rounded border-gray-300 text-[#4ECDC4] focus:ring-[#4ECDC4]"
                     />
-                    <span>{z.name}</span>
+                    <span>{z.nombre}</span>
                   </label>
                 ))}
               </motion.div>

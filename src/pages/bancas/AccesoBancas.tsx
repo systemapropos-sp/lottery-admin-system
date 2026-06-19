@@ -3,19 +3,21 @@ import { motion } from "framer-motion";
 import { ChevronDown, Settings } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import DataTable from "@/components/ui/DataTable";
-import { bettingPools, zones } from "@/data/mockData";
-import type { BettingPool } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
+import type { Banca } from "@/store/bancasStore";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 export default function AccesoBancas() {
+  const { bancas: bettingPools, zonas: zonasRaw } = useBancasZonas();
+  const zones = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [pageSize, setPageSize] = useState(10);
   const [showZoneDropdown, setShowZoneDropdown] = useState(false);
   const [activeToggles, setActiveToggles] = useState<Record<string, boolean>>(() => {
     const map: Record<string, boolean> = {};
     bettingPools.forEach((bp) => {
-      map[bp.id] = bp.isActive;
+      map[bp.id] = bp.is_active;
     });
     return map;
   });
@@ -26,27 +28,27 @@ export default function AccesoBancas() {
 
   const filteredData = useMemo(() => {
     if (selectedZones.length === 0) return bettingPools;
-    return bettingPools.filter((bp) => selectedZones.includes(bp.zoneId));
+    return bettingPools.filter((bp) => selectedZones.includes(bp.zone_id ?? ""));
   }, [selectedZones]);
 
   const columns = [
     {
       key: "numero",
       header: "Numero",
-      accessor: (_row: BettingPool) => "",
+      accessor: (_row: Banca) => "",
       sortable: false,
       align: "center" as const,
       width: "60px",
-      cell: (_row: BettingPool, idx?: number) => (
+      cell: (_row: Banca, idx?: number) => (
         <span className="font-medium text-[#666666]">{(idx ?? 0) + 1}</span>
       ),
     },
     {
       key: "usuarios",
       header: "Usuarios",
-      accessor: (row: BettingPool) => row.code,
+      accessor: (row: Banca) => row.code,
       sortable: true,
-      cell: (row: BettingPool) => (
+      cell: (row: Banca) => (
         <a href={`#/pool-users`} className="text-[#4ECDC4] hover:underline font-medium">
           {row.code}
         </a>
@@ -55,36 +57,36 @@ export default function AccesoBancas() {
     {
       key: "nombre",
       header: "Nombre",
-      accessor: (row: BettingPool) => row.name,
+      accessor: (row: Banca) => row.name,
       sortable: true,
     },
     {
       key: "referencia",
       header: "Referencia",
-      accessor: (row: BettingPool) => row.mwrCode,
+      accessor: (row: Banca) => row.mwr_code ?? "",
       sortable: true,
-      cell: (row: BettingPool) => (
-        <span className="font-mono text-[13px] text-[#666666]">{row.mwrCode}</span>
+      cell: (row: Banca) => (
+        <span className="font-mono text-[13px] text-[#666666]">{row.mwr_code}</span>
       ),
     },
     {
       key: "zona",
       header: "Zona",
-      accessor: (row: BettingPool) => row.zoneName,
+      accessor: (row: Banca) => row.zone_name ?? "",
       sortable: true,
-      cell: (row: BettingPool) => (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.zoneName === "SFM" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-700"}`}>
-          {row.zoneName}
+      cell: (row: Banca) => (
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.zone_name === "SFM" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-700"}`}>
+          {row.zone_name}
         </span>
       ),
     },
     {
       key: "activa",
       header: "Activa",
-      accessor: (row: BettingPool) => (activeToggles[row.id] ? "Si" : "No"),
+      accessor: (row: Banca) => (activeToggles[row.id] ? "Si" : "No"),
       sortable: false,
       align: "center" as const,
-      cell: (row: BettingPool) => (
+      cell: (row: Banca) => (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -174,7 +176,7 @@ export default function AccesoBancas() {
                       }}
                       className="rounded border-gray-300 text-[#4ECDC4] focus:ring-[#4ECDC4]"
                     />
-                    <span>{z.name}</span>
+                    <span>{z.nombre}</span>
                   </label>
                 ))}
               </motion.div>

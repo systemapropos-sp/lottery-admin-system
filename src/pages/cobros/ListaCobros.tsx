@@ -5,25 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import DataTable from "@/components/ui/DataTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Column } from "@/components/ui/DataTable";
-import { transactions } from "@/data/mockData";
-
-// ─── NMV Data ─────────────────────────────────────────────────────────────────
-const NMV_BANCAS = [
-  {id:"b01",code:"NMV-0001",name:"NMV RD 01"},
-  {id:"b02",code:"NMV-0002",name:"NMV RD 02"},
-  {id:"b03",code:"NMV-0003",name:"NMV RD 03"},
-  {id:"b04",code:"NMV-0004",name:"NMV RD 04"},
-  {id:"b05",code:"NMV-0005",name:"NMV RD 05"},
-  {id:"b06",code:"NMV-0006",name:"NMV RD 06"},
-  {id:"b07",code:"NMV-0007",name:"NMV RD 07"},
-  {id:"b08",code:"NMV-0008",name:"NMV RD 08"},
-  {id:"b09",code:"NMV-0009",name:"NMV RD 09"},
-  {id:"b10",code:"NMV-0010",name:"NMV RD 10"},
-  {id:"b11",code:"NMV-0011",name:"NMV RD 11"},
-  {id:"b12",code:"NMV-0012",name:"NMV RD 12"},
-  {id:"b13",code:"NMV-0013",name:"NMV RD 13"},
-];
-const NMV_ZONAS = [{id:"z1",nombre:"Default"},{id:"z2",nombre:"SFM"}];
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 // ─── Multi-Select Reusable ─────────────────────────────────────────────────────
 function MultiSelectDropdown({items,selected,onChange,placeholder,labelKey="name",idKey="id"}:{
@@ -85,6 +67,10 @@ interface CobroRow {
 }
 
 export default function ListaCobros() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const NMV_BANCAS = bancasRaw.map(b => ({ id: b.id, code: b.code, name: b.name }));
+  const NMV_ZONAS  = zonasRaw.map(z  => ({ id: z.id, nombre: z.nombre }));
+
   const [filterType, setFilterType] = useState("");
   const [filterBancas, setFilterBancas] = useState<string[]>([]);
   const [filterZonas, setFilterZonas] = useState<string[]>([]);
@@ -102,23 +88,8 @@ export default function ListaCobros() {
   const [formMonto, setFormMonto] = useState("");
   const [formNotas, setFormNotas] = useState("");
 
-  // Transform mock data
-  const allData: CobroRow[] = useMemo(() => {
-    return transactions.map((t, idx) => {
-      const d = new Date(t.createdAt);
-      return {
-        id: t.id,
-        numero: idx + 1,
-        fecha: d.toLocaleDateString("es-ES"),
-        hora: d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }),
-        tipo: t.type,
-        banca: t.bettingPoolName,
-        monto: t.amount,
-        creadoPor: t.createdBy,
-        notas: t.notes || "",
-      };
-    });
-  }, []);
+  // Datos reales de cobros — vacío hasta integración con Supabase
+  const allData: CobroRow[] = [];
 
   const filteredData = useMemo(() => {
     return allData.filter((row) => {

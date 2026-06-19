@@ -1,12 +1,34 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
+import type { Banca } from "@/store/bancasStore";
+import type { Zona } from "@/store/zonasStore";
+
+// ─── Auto-número: calcula el siguiente código disponible ──────────────────────
+function getNextBancaCode(bancas: Banca[]): string {
+  const codes = bancas.map((b) => b.mwr_code || b.code || "");
+  let maxNum = 0;
+  let prefix = "RDV";
+  let padding = 3;
+  codes.forEach((code) => {
+    const m = code.match(/^([A-Za-z]+-[A-Za-z]*)(\d+)$|^([A-Za-z]+)-(\d+)$/);
+    if (m) {
+      const p = m[1] || m[3];
+      const n = parseInt(m[2] || m[4], 10);
+      if (!isNaN(n)) {
+        prefix = p.replace(/-$/, "");
+        padding = (m[2] || m[4]).length;
+        if (n > maxNum) maxNum = n;
+      }
+    }
+  });
+  return `${prefix}-${String(maxNum + 1).padStart(padding, "0")}`;
+}
 
 // ─── Static data (outside component to avoid recreation) ──────────────────────
 const TABS = ["General","Configuracion","Pies de pagina","Premios & Comisiones","Horarios de sorteos","Sorteos","Gastos automaticos"];
-const ZONAS = ["SFM","Santo Domingo","Santiago","La Vega","Moca","Bonao"];
-const TEMPLATE_BANCAS = ["NMV RD 01","NMV RD 02","NMV RD 03","NMV RD 04","NMV RD 05","NMV RD 06","NMV RD 07","NMV RD 08"];
 const TEMPLATE_CHIPS = ["CONFIGURACION","PIES DE PAGINA","PREMIOS & COMISIONES","HORARIOS DE SORTEOS","SORTEOS","ESTILOS","REGLAS"];
 const DAYS = ["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
 const SORTEOS_LIST = ["LA PRIMERA","NEW YORK AM","NEW YORK PM","FLORIDA AM","FLORIDA PM","GANA MAS","NACIONAL","QUINIELA PALE","QUINIELA REAL","LOTEKA","SUPER PALE REAL-GANA MAS","SUPER PALE NACIONAL-QP","SUPER PALE NY-GANA MAS","SUPER PALE NY-NACIONAL","LA SUERTE","LOTEDOM","KING LOTTERY AM","KING LOTTERY PM","ANGUILA 1PM","ANGUILA 6PM","ANGUILA 9PM","ANGUILA 10AM","LA PRIMERA 7PM","LA SUERTE 6:00PM"];
@@ -77,7 +99,8 @@ function CreateBtn() {
 }
 
 function PlantillaSection() {
-  const [banca, setBanca] = useState(TEMPLATE_BANCAS[0]);
+  const { bancas } = useBancasZonas();
+  const [bancaId, setBancaId] = useState("");
   const [chips, setChips] = useState([...TEMPLATE_CHIPS]);
   return (
     <div className="mt-2 pt-6 border-t border-[#E5E5E0]">
@@ -85,8 +108,9 @@ function PlantillaSection() {
       <div className="border-t border-[#E5E5E0] pt-4 space-y-4">
         <div className="flex items-center gap-3">
           <label className="text-sm font-medium text-[#555] w-14">Banca</label>
-          <select value={banca} onChange={e => setBanca(e.target.value)} className="px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] bg-white min-w-[180px]">
-            {TEMPLATE_BANCAS.map(b => <option key={b}>{b}</option>)}
+          <select value={bancaId} onChange={e => setBancaId(e.target.value)} className="px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] bg-white min-w-[180px]">
+            <option value="">Seleccionar banca...</option>
+            {bancas.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
           </select>
         </div>
         <div>
@@ -107,19 +131,60 @@ function PlantillaSection() {
 
 // ─── Tab content components ────────────────────────────────────────────────────
 function TabGeneral() {
+  const { bancas, zonas } = useBancasZonas();
+  const nextCode = useMemo(() => getNextBancaCode(bancas), [bancas]);
+  const [numero, setNumero] = useState(nextCode);
+
+  // update numero when bancas load
+  useMemo(() => { setNumero(getNextBancaCode(bancas)); }, [bancas]);
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {["Nombre *","Nombre de usuario *","Contrasena *","Confirmacion *","Numero *","Ubicacion","Referencia"].map(f => (
+        {["Nombre *","Nombre de usuario *","Contrasena *","Confirmacion *","Ubicacion","Referencia"].map(f => (
           <div key={f}>
             <label className="block text-sm font-medium text-[#333] mb-1">{f}</label>
             <input type={f.includes("Contrasena") || f.includes("Confirmacion") ? "password" : "text"} placeholder={f.replace(" *","")} className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4]" />
           </div>
         ))}
+
+        {/* ── Numero — auto-numeración ─────────────────────────────────────── */}
+        <div>
+          <label className="block text-sm font-medium text-[#333] mb-1">
+            Numero *
+            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-600 border border-teal-100">
+              <Sparkles size={9} />
+              Auto-asignado
+            </span>
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value)}
+              className="w-full px-3 py-2 border-2 border-[#4ECDC4] rounded-lg text-sm focus:outline-none font-mono font-bold text-teal-700 bg-teal-50"
+              placeholder="RDV-001"
+            />
+            <button
+              type="button"
+              onClick={() => setNumero(nextCode)}
+              title="Restaurar auto-número"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-teal-500 hover:text-teal-700 font-semibold transition-colors"
+            >
+              ↺ auto
+            </button>
+          </div>
+          <p className="text-[10px] text-[#999] mt-1">
+            Siguiente disponible: <span className="font-mono font-bold text-teal-600">{nextCode}</span>
+            {" "}(basado en {bancas.length} bancas existentes)
+          </p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-[#333] mb-1">Zona</label>
           <select className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] bg-white">
-            {ZONAS.map(z => <option key={z}>{z}</option>)}
+            <option value="">Seleccionar zona...</option>
+            {zonas.map((z: Zona) => <option key={z.id} value={z.id}>{z.nombre}</option>)}
           </select>
         </div>
       </div>
@@ -134,6 +199,7 @@ function TabGeneral() {
 }
 
 function TabConfiguracion() {
+  const { zonas } = useBancasZonas();
   const [modoImp, setModoImp] = useState<"DRIVER" | "GENERICO">("DRIVER");
   const [modoPago, setModoPago] = useState<"BANCA" | "GRUPO" | "ZONA">("GRUPO");
   return (
@@ -141,7 +207,8 @@ function TabConfiguracion() {
       <div className="flex items-center gap-4 mb-5">
         <label className="text-sm font-medium text-[#555] w-14">Zona</label>
         <select className="px-3 py-1.5 border border-[#E5E5E0] rounded-lg text-sm bg-white focus:outline-none focus:border-[#4ECDC4] min-w-[160px]">
-          {ZONAS.map(z => <option key={z}>{z}</option>)}
+          <option value="">Seleccionar zona...</option>
+          {zonas.map((z: Zona) => <option key={z.id} value={z.id}>{z.nombre}</option>)}
         </select>
       </div>
 

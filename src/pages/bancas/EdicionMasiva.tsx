@@ -2,11 +2,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Save, ChevronDown } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const SORTEOS = ["LA PRIMERA","NEW YORK AM","NEW YORK PM","FLORIDA AM","FLORIDA PM","GANA MAS","NACIONAL","QUINIELA PALE","QUINIELA REAL","LOTEKA","SUPER PALE REAL-GANA MAS","SUPER PALE NACIONAL-QP","SUPER PALE NY-GANA MAS","SUPER PALE NY-NACIONAL","LA SUERTE","LOTEDOM","KING LOTTERY AM","KING LOTTERY PM","ANGUILA 1PM","ANGUILA 6PM","ANGUILA 9PM","ANGUILA 10AM","LA PRIMERA 7PM","LA SUERTE 6:00PM","TODOS"];
-const BANCAS  = Array.from({length:20},(_,i)=>i===0?"MATADOR-SPORT (1)":`MMW RD ${String(i+1).padStart(2,"0")} (${i+1})`);
-const ZONAS   = ["DEFAULT","SFM"];
 
 const PRIZE_TYPES = [
   {t:"DIRECTO",       s:"Todos en secuencia", f:["","Segundo Pago","Tercer Pago","Dobles"]},
@@ -97,11 +96,13 @@ function Chip({label,active,onClick}:{label:string;active:boolean;onClick:()=>vo
 }
 
 // ─── Shared footer ────────────────────────────────────────────────────────────
-function SharedFooter({selSorteos,setSelSorteos,selBancas,setSelBancas,selZonas,setSelZonas,updGeneral,setUpdGeneral}:{
+function SharedFooter({selSorteos,setSelSorteos,selBancas,setSelBancas,selZonas,setSelZonas,updGeneral,setUpdGeneral,bancas,zonas}:{
   selSorteos:Set<string>;setSelSorteos:(s:Set<string>)=>void;
   selBancas:Set<string>;setSelBancas:(s:Set<string>)=>void;
   selZonas:Set<string>;setSelZonas:(s:Set<string>)=>void;
   updGeneral:boolean;setUpdGeneral:(v:boolean)=>void;
+  bancas:{id:string;ref:string;codigo:string}[];
+  zonas:{id:string;nombre:string}[];
 }){
   const toggleS=(v:string)=>{const n=new Set(selSorteos);n.has(v)?n.delete(v):n.add(v);setSelSorteos(n);};
   const toggleB=(v:string)=>{const n=new Set(selBancas);n.has(v)?n.delete(v):n.add(v);setSelBancas(n);};
@@ -114,11 +115,11 @@ function SharedFooter({selSorteos,setSelSorteos,selBancas,setSelBancas,selZonas,
       </div>
       <div className="grid grid-cols-[80px_1fr] gap-3 items-start">
         <span className="text-xs font-medium text-[#666] pt-1">Bancas</span>
-        <div className="flex flex-wrap gap-1.5">{BANCAS.map(b=><Chip key={b} label={b} active={selBancas.has(b)} onClick={()=>toggleB(b)}/>)}</div>
+        <div className="flex flex-wrap gap-1.5">{bancas.map(b=><Chip key={b.id} label={b.ref} active={selBancas.has(b.id)} onClick={()=>toggleB(b.id)}/>)}</div>
       </div>
       <div className="grid grid-cols-[80px_1fr] gap-3 items-start">
         <span className="text-xs font-medium text-[#666] pt-1">Zonas</span>
-        <div className="flex flex-wrap gap-1.5">{ZONAS.map(z=><Chip key={z} label={z} active={selZonas.has(z)} onClick={()=>toggleZ(z)}/>)}</div>
+        <div className="flex flex-wrap gap-1.5">{zonas.map(z=><Chip key={z.id} label={z.nombre} active={selZonas.has(z.id)} onClick={()=>toggleZ(z.id)}/>)}</div>
       </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -137,7 +138,7 @@ function SharedFooter({selSorteos,setSelSorteos,selBancas,setSelBancas,selZonas,
 }
 
 // ─── Tab: Configuración ───────────────────────────────────────────────────────
-function TabConfig({footer}:{footer:React.ReactNode}){
+function TabConfig({footer,zonas}:{footer:React.ReactNode;zonas:{id:string;nombre:string}[]}){
   const [zona,setZona]=useState("");
   const [idioma,setIdioma]=useState("ESPAÑOL");
   const [impresion,setImpresion]=useState("DRIVER");
@@ -166,7 +167,7 @@ function TabConfig({footer}:{footer:React.ReactNode}){
               <select value={zona} onChange={e=>setZona(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg appearance-none focus:outline-none focus:border-[#4ECDC4]">
                 <option value="">—</option>
-                {ZONAS.map(z=><option key={z} value={z}>{z}</option>)}
+                {zonas.map(z=><option key={z.id} value={z.id}>{z.nombre}</option>)}
               </select>
               <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none"/>
             </div>
@@ -316,17 +317,21 @@ function TabSorteos({footer}:{footer:React.ReactNode}){
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function EdicionMasiva(){
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const bancas = bancasRaw.map(b => ({ id: b.id, ref: b.name, codigo: b.code }));
+  const zonas  = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
   const [tab,setTab]=useState<Tab>("Configuración");
   const [selSorteos,setSelSorteos]=useState<Set<string>>(new Set(SORTEOS));
-  const [selBancas,setSelBancas]=useState<Set<string>>(new Set(BANCAS));
-  const [selZonas,setSelZonas]=useState<Set<string>>(new Set(ZONAS));
+  const [selBancas,setSelBancas]=useState<Set<string>>(new Set());
+  const [selZonas,setSelZonas]=useState<Set<string>>(new Set());
   const [updGeneral,setUpdGeneral]=useState(true);
 
   const footer=(
     <SharedFooter selSorteos={selSorteos} setSelSorteos={setSelSorteos}
       selBancas={selBancas} setSelBancas={setSelBancas}
       selZonas={selZonas} setSelZonas={setSelZonas}
-      updGeneral={updGeneral} setUpdGeneral={setUpdGeneral}/>
+      updGeneral={updGeneral} setUpdGeneral={setUpdGeneral}
+      bancas={bancas} zonas={zonas}/>
   );
 
   return(
@@ -344,7 +349,7 @@ export default function EdicionMasiva(){
             ))}
           </div>
         </div>
-        {tab==="Configuración"       && <TabConfig footer={footer}/>}
+        {tab==="Configuración"       && <TabConfig footer={footer} zonas={zonas}/>}
         {tab==="Pies de página"      && <TabPies footer={footer}/>}
         {tab==="Premios & Comisiones"&& <TabPremios footer={footer}/>}
         {tab==="Sorteos"             && <TabSorteos footer={footer}/>}

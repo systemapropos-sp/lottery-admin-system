@@ -2,17 +2,10 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, ChevronDown, FileText, Search, X } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 function fmt(n:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(n);}
 function today(){return new Date().toISOString().split("T")[0];}
-
-const MOCK = [
-  { fecha:"06/17/2026", venta:300250, premios:396560, comisiones:1395.20, comision2:0, neto:-97705.20 },
-  { fecha:"06/16/2026", venta:185320, premios:142100, comisiones:890.40,  comision2:0, neto:42329.60  },
-  { fecha:"06/15/2026", venta:220445, premios:198340, comisiones:1102.10, comision2:0, neto:21002.90  },
-];
-const ZONAS_LIST  = ["Default","SFM"];
-const BANCAS_LIST = ["MATADOR-SPORT","MMW RD 02","MMW RD 03"];
 
 function MultiSelect({ label, options, value, onChange }: {
   label:string; options:string[]; value:string[]; onChange:(v:string[])=>void;
@@ -42,7 +35,14 @@ function MultiSelect({ label, options, value, onChange }: {
   );
 }
 
+interface MockRow { fecha:string; venta:number; premios:number; comisiones:number; comision2:number; neto:number; }
+
 export default function VentasPorFecha() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const BANCAS_LIST = bancasRaw.map(b => b.name);
+  const ZONAS_LIST  = zonasRaw.map(z => z.nombre);
+  const MOCK: MockRow[] = [];
+
   const [fi,setFi]=useState(today()); const [ff,setFf]=useState(today());
   const [selBancas,setSelBancas]=useState<string[]>([]);
   const [selZonas,setSelZonas]=useState<string[]>([]);

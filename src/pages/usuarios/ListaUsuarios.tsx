@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Eye, Pencil, Trash2, Plus, Shield, User, Building2, LayoutGrid, LayoutList } from "lucide-react";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
-// ─── Datos locales NMV (sin mockData) ────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface AdminUser {
   id: string; username: string; fullName: string; email: string;
@@ -15,26 +16,10 @@ interface BancaUser {
 }
 
 const adminUsers: AdminUser[] = [
-  {id:"a1",username:"superadmin",  fullName:"Super Administrador", email:"super@nmvapp.com",    role:"superadmin", isActive:true, lastLogin:"2026-06-17 10:30"},
-  {id:"a2",username:"admin",       fullName:"Administrador NMV",   email:"admin@nmvapp.com",    role:"admin",      isActive:true, lastLogin:"2026-06-17 09:15"},
-  {id:"a3",username:"supervisor1", fullName:"Supervisor Zona 1",   email:"sup1@nmvapp.com",     role:"supervisor", isActive:true, lastLogin:"2026-06-16 18:45"},
-  {id:"a4",username:"supervisor2", fullName:"Supervisor SFM",      email:"sup2@nmvapp.com",     role:"supervisor", isActive:false,lastLogin:"2026-06-10 08:00"},
-];
-
-const bancaUsers: BancaUser[] = [
-  {id:"b01",code:"NMV-0001",name:"NMV RD 01",owner:"Operador 01",zone:"Default",isActive:true, lastLogin:"2026-06-17 11:00"},
-  {id:"b02",code:"NMV-0002",name:"NMV RD 02",owner:"Operador 02",zone:"Default",isActive:true, lastLogin:"2026-06-17 10:50"},
-  {id:"b03",code:"NMV-0003",name:"NMV RD 03",owner:"Operador 03",zone:"Default",isActive:true, lastLogin:"2026-06-17 10:20"},
-  {id:"b04",code:"NMV-0004",name:"NMV RD 04",owner:"Operador 04",zone:"Default",isActive:true, lastLogin:"2026-06-17 09:30"},
-  {id:"b05",code:"NMV-0005",name:"NMV RD 05",owner:"Operador 05",zone:"Default",isActive:true, lastLogin:"2026-06-17 08:45"},
-  {id:"b06",code:"NMV-0006",name:"NMV RD 06",owner:"Operador 06",zone:"Default",isActive:true, lastLogin:"2026-06-16 22:00"},
-  {id:"b07",code:"NMV-0007",name:"NMV RD 07",owner:"Operador 07",zone:"Default",isActive:false,lastLogin:"2026-06-15 14:30"},
-  {id:"b08",code:"NMV-0008",name:"NMV RD 08",owner:"Operador 08",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 10:10"},
-  {id:"b09",code:"NMV-0009",name:"NMV RD 09",owner:"Operador 09",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 09:55"},
-  {id:"b10",code:"NMV-0010",name:"NMV RD 10",owner:"Operador 10",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 09:40"},
-  {id:"b11",code:"NMV-0011",name:"NMV RD 11",owner:"Operador 11",zone:"SFM",    isActive:true, lastLogin:"2026-06-17 08:00"},
-  {id:"b12",code:"NMV-0012",name:"NMV RD 12",owner:"Operador 12",zone:"SFM",    isActive:true, lastLogin:"2026-06-16 20:00"},
-  {id:"b13",code:"NMV-0013",name:"NMV RD 13",owner:"Operador 13",zone:"SFM",    isActive:false,lastLogin:"2026-06-14 10:00"},
+  {id:"a1",username:"superadmin",  fullName:"Super Administrador", email:"super@nmvapp.com", role:"superadmin", isActive:true,  lastLogin:""},
+  {id:"a2",username:"admin",       fullName:"Administrador NMV",   email:"admin@nmvapp.com", role:"admin",      isActive:true,  lastLogin:""},
+  {id:"a3",username:"supervisor1", fullName:"Supervisor Zona 1",   email:"sup1@nmvapp.com",  role:"supervisor", isActive:true,  lastLogin:""},
+  {id:"a4",username:"supervisor2", fullName:"Supervisor SFM",      email:"sup2@nmvapp.com",  role:"supervisor", isActive:false, lastLogin:""},
 ];
 
 const roleConfig = {
@@ -56,6 +41,19 @@ function ActionBtns({onView,onEdit,onDelete}:{onView:()=>void;onEdit:()=>void;on
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function ListaUsuarios() {
+  const { bancas: bancasRaw } = useBancasZonas();
+
+  // Bancas desde Supabase — datos reales
+  const bancaUsers: BancaUser[] = bancasRaw.map(b => ({
+    id:       b.id,
+    code:     b.code,
+    name:     b.name,
+    owner:    "",
+    zone:     b.zone_name ?? b.zone_id ?? "",
+    isActive: b.is_active,
+    lastLogin:"",
+  }));
+
   const [activeTab, setActiveTab] = useState<"administradores"|"bancas">("administradores");
   const [searchAdmin, setSearchAdmin] = useState("");
   const [searchBanca, setSearchBanca] = useState("");
@@ -71,9 +69,8 @@ export default function ListaUsuarios() {
   const filteredBancas = useMemo(()=>
     bancaUsers.filter(b=>
       b.code.toLowerCase().includes(searchBanca.toLowerCase()) ||
-      b.name.toLowerCase().includes(searchBanca.toLowerCase()) ||
-      b.owner.toLowerCase().includes(searchBanca.toLowerCase())
-    ),[searchBanca]);
+      b.name.toLowerCase().includes(searchBanca.toLowerCase())
+    ),[searchBanca, bancaUsers]);
 
   return (
     <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.3}} className="space-y-5">
@@ -93,10 +90,10 @@ export default function ListaUsuarios() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          {label:"Admins Activos",  val:adminUsers.filter(u=>u.isActive).length,    icon:Shield,   color:"text-purple-600", bg:"bg-purple-50"},
-          {label:"Admins Inactivos",val:adminUsers.filter(u=>!u.isActive).length,   icon:Shield,   color:"text-gray-400",   bg:"bg-gray-50"},
-          {label:"Bancas Activas",  val:bancaUsers.filter(b=>b.isActive).length,    icon:Building2,color:"text-teal-600",   bg:"bg-teal-50"},
-          {label:"Bancas Inactivas",val:bancaUsers.filter(b=>!b.isActive).length,   icon:Building2,color:"text-red-400",    bg:"bg-red-50"},
+          {label:"Admins Activos",  val:adminUsers.filter(u=>u.isActive).length,  icon:Shield,   color:"text-purple-600", bg:"bg-purple-50"},
+          {label:"Admins Inactivos",val:adminUsers.filter(u=>!u.isActive).length, icon:Shield,   color:"text-gray-400",   bg:"bg-gray-50"},
+          {label:"Bancas Activas",  val:bancaUsers.filter(b=>b.isActive).length,  icon:Building2,color:"text-teal-600",   bg:"bg-teal-50"},
+          {label:"Bancas Inactivas",val:bancaUsers.filter(b=>!b.isActive).length, icon:Building2,color:"text-red-400",    bg:"bg-red-50"},
         ].map(s=>{
           const Icon=s.icon;
           return(
@@ -131,7 +128,6 @@ export default function ListaUsuarios() {
               );
             })}
           </div>
-          {/* View toggle */}
           <div className="flex items-center gap-1 pr-1">
             <button onClick={()=>setViewMode("list")}
               className={`p-1.5 rounded-lg transition-colors ${viewMode==="list"?"bg-[#E0F7F5] text-[#14B8A6]":"text-[#999] hover:text-[#666]"}`}
@@ -143,7 +139,6 @@ export default function ListaUsuarios() {
         </div>
 
         <div className="p-4">
-          {/* Search */}
           <div className="relative mb-4">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/>
             <input
@@ -154,11 +149,9 @@ export default function ListaUsuarios() {
           </div>
 
           <AnimatePresence mode="wait">
-            {/* ADMINISTRADORES */}
             {activeTab==="administradores"&&(
               <motion.div key="admins" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}>
                 {viewMode==="list"?(
-                  /* List view */
                   <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
                     <table className="w-full text-sm">
                       <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
@@ -202,7 +195,6 @@ export default function ListaUsuarios() {
                     </table>
                   </div>
                 ):(
-                  /* Grid view */
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredAdmins.map(u=>{
                       const rc=roleConfig[u.role];
@@ -235,37 +227,33 @@ export default function ListaUsuarios() {
               </motion.div>
             )}
 
-            {/* BANCAS */}
             {activeTab==="bancas"&&(
               <motion.div key="bancas" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}>
                 {viewMode==="list"?(
-                  /* List view */
                   <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
                     <table className="w-full text-sm">
                       <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
-                        {["Código","Nombre","Propietario","Zona","Estado","Último acceso","Acciones"].map(h=>(
+                        {["Código","Nombre","Zona","Estado","Acciones"].map(h=>(
                           <th key={h} className="px-3 py-3 text-xs font-semibold text-[#555] text-left">{h}</th>
                         ))}
                       </tr></thead>
                       <tbody>
                         {filteredBancas.length===0?(
-                          <tr><td colSpan={7} className="py-10 text-center text-sm text-[#999]">No se encontraron bancas</td></tr>
+                          <tr><td colSpan={5} className="py-10 text-center text-sm text-[#999]">No hay bancas registradas</td></tr>
                         ):filteredBancas.map((b,ri)=>(
                           <tr key={b.id} className={`border-b border-[#F5F5F0] ${ri%2===0?"bg-white":"bg-[#FAFAFA]"} hover:bg-[#E0F7F5]/20 transition-colors`}>
                             <td className="px-3 py-2.5">
                               <span className="px-2 py-0.5 text-xs font-bold font-mono rounded-lg bg-[#F5F5F0] text-[#555]">{b.code}</span>
                             </td>
                             <td className="px-3 py-2.5 font-medium text-[#333]">{b.name}</td>
-                            <td className="px-3 py-2.5 text-[#666]">{b.owner}</td>
                             <td className="px-3 py-2.5">
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-[#E0F7F5] text-[#14B8A6]">{b.zone}</span>
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-[#E0F7F5] text-[#14B8A6]">{b.zone || "—"}</span>
                             </td>
                             <td className="px-3 py-2.5">
                               <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${b.isActive?"bg-[#F0FDF4] text-[#16A34A]":"bg-[#F9FAFB] text-[#999]"}`}>
                                 {b.isActive?"Activa":"Inactiva"}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-[#999]">{b.lastLogin}</td>
                             <td className="px-3 py-2.5">
                               <ActionBtns onView={()=>{}} onEdit={()=>{}} onDelete={()=>{}}/>
                             </td>
@@ -275,7 +263,6 @@ export default function ListaUsuarios() {
                     </table>
                   </div>
                 ):(
-                  /* Grid view */
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredBancas.map(b=>(
                       <div key={b.id} className="bg-white rounded-xl border border-[#E5E5E0] p-4 hover:shadow-md transition-shadow">
@@ -293,12 +280,8 @@ export default function ListaUsuarios() {
                             {b.isActive?"Activa":"Inactiva"}
                           </span>
                         </div>
-                        <p className="text-xs text-[#666] mb-1">{b.owner}</p>
-                        <p className="text-xs text-[#999] mb-3">Zona: <span className="text-[#14B8A6] font-medium">{b.zone}</span></p>
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] text-[#bbb]">{b.lastLogin}</p>
-                          <ActionBtns onView={()=>{}} onEdit={()=>{}} onDelete={()=>{}}/>
-                        </div>
+                        <p className="text-xs text-[#999] mb-3">Zona: <span className="text-[#14B8A6] font-medium">{b.zone || "—"}</span></p>
+                        <ActionBtns onView={()=>{}} onEdit={()=>{}} onDelete={()=>{}}/>
                       </div>
                     ))}
                   </div>

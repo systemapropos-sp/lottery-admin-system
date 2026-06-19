@@ -1,4 +1,4 @@
-// Zonas store — persiste en Supabase
+// Zonas store — reads from zonas table in Supabase
 import { create } from "zustand";
 import { supabase, BUSINESS_ID } from "@/lib/supabase";
 
@@ -9,6 +9,7 @@ export interface Zona {
   descripcion: string;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 interface ZonasState {
@@ -30,9 +31,9 @@ export const useZonasStore = create<ZonasState>((set) => ({
     set({ loading: true, error: null });
     const { data, error } = await supabase
       .from("zonas")
-      .select("*")
+      .select("id,business_id,nombre,descripcion,is_active,created_at,updated_at")
       .eq("business_id", BUSINESS_ID)
-      .order("created_at", { ascending: true });
+      .order("nombre", { ascending: true });
     if (error) {
       set({ loading: false, error: error.message });
     } else {
@@ -47,7 +48,7 @@ export const useZonasStore = create<ZonasState>((set) => ({
       .select()
       .single();
     if (error) return { ok: false, error: error.message };
-    set(s => ({ zonas: [...s.zonas, data] }));
+    set((s) => ({ zonas: [...s.zonas, data] }));
     return { ok: true };
   },
 
@@ -59,14 +60,14 @@ export const useZonasStore = create<ZonasState>((set) => ({
       .select()
       .single();
     if (error) return false;
-    set(s => ({ zonas: s.zonas.map(z => z.id === id ? { ...z, ...data } : z) }));
+    set((s) => ({ zonas: s.zonas.map((z) => (z.id === id ? { ...z, ...data } : z)) }));
     return true;
   },
 
   deleteZona: async (id) => {
     const { error } = await supabase.from("zonas").delete().eq("id", id);
     if (error) return false;
-    set(s => ({ zonas: s.zonas.filter(z => z.id !== id) }));
+    set((s) => ({ zonas: s.zonas.filter((z) => z.id !== id) }));
     return true;
   },
 }));

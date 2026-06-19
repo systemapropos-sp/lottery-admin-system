@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLocation } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, X, Pencil, Save, Loader2 } from "lucide-react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { useBancasStore } from "@/store/bancasStore";
 import { useZonasStore } from "@/store/zonasStore";
+import { supabase, BUSINESS_ID } from "@/lib/supabase";
 // ─── Local type alias (compatible con datos de Supabase) ──────────────────────
 interface BettingPool { id:string; name:string; code:string; mwrCode:string; balance:number; isActive:boolean; }
 
@@ -43,10 +44,7 @@ const employees: Employee[] = [];
 
 const banks: Bank[] = [];
 
-const zoneEntities = [
-  {id:"z1", name:"Default", code:"ZON-0001", balance:110000, caidaAcumulada:0, prestamo:0},
-  {id:"z2", name:"SFM",     code:"ZON-0002", balance:20000,  caidaAcumulada:0, prestamo:0},
-];
+// zoneEntities: loaded dynamically from Supabase via useBancasZonas
 
 const others: OtherEntity[] = [];
 
@@ -67,10 +65,10 @@ function formatCurrency(value: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-type CrearForm = {nombre:string; codigo:string; tipo:TabType; balance:string;};
+type CrearForm = {nombre:string; codigo:string; tipo:TabType; balance:string; caidaAcumulada:string; prestamo:string;};
 
-function CrearEntidadModal({activeTab,onClose}:{activeTab:TabType;onClose:()=>void}){
-  const [form,setForm]=useState<CrearForm>({nombre:"",codigo:"",tipo:activeTab,balance:"0"});
+function CrearEntidadModal({activeTab,onClose,onCreated}:{activeTab:TabType;onClose:()=>void;onCreated:()=>void}){
+  const [form,setForm]=useState<CrearForm>({nombre:"",codigo:"",tipo:activeTab,balance:"0",caidaAcumulada:"0",prestamo:"0"});
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
   const { createBanca } = useBancasStore();
@@ -81,14 +79,29 @@ function CrearEntidadModal({activeTab,onClose}:{activeTab:TabType;onClose:()=>vo
     setLoading(true); setErr("");
     let result: {ok:boolean;error?:string};
     if (form.tipo === "Bancas") {
-      result = await createBanca({ nombre:form.nombre.trim(), codigo:form.codigo.trim(), mwr_code:form.codigo.trim(), balance:parseFloat(form.balance)||0, is_active:true, zona_id:null, notas:"" });
+      result = await createBanca({ name:form.nombre.trim(), code:form.codigo.trim(), mwr_code:form.codigo.trim(), balance:parseFloat(form.balance)||0, is_active:true, zone_id:null, zone_name:null });
     } else if (form.tipo === "Zonas") {
       result = await createZona({ nombre:form.nombre.trim(), descripcion:"", is_active:true });
     } else {
-      result = { ok:true }; // other types → TODO
+      // Empleados, Bancos, Otros → save to 'entidades' table
+      const tipoMap: Record<TabType, string> = {
+        Bancas:"bancas", Empleados:"empleados", Bancos:"bancos", Zonas:"zonas", Otros:"otros"
+      };
+      const { error } = await supabase.from("entidades").insert({
+        nombre:    form.nombre.trim(),
+        codigo:    form.codigo.trim() || null,
+        tipo:      tipoMap[form.tipo],
+        balance:   parseFloat(form.balance) || 0,
+        caida_acumulada: parseFloat(form.caidaAcumulada) || 0,
+        prestamo:  parseFloat(form.prestamo) || 0,
+        is_active: true,
+        business_id: BUSINESS_ID,
+      });
+      result = error ? { ok:false, error: error.message } : { ok:true };
     }
     setLoading(false);
     if (!result.ok) { setErr(result.error ?? "Error al guardar"); return; }
+    onCreated();
     onClose();
   };
 
@@ -160,8 +173,8 @@ export default function ListaEntidades() {
   // Map Banca (Supabase) → BettingPool (display format)
   const bettingPools: BettingPool[] = bancas.map(b => ({
     id: b.id,
-    name: b.nombre,
-    code: b.codigo,
+    name: b.name,
+    code: b.code,
     mwrCode: b.mwr_code,
     balance: b.balance,
     isActive: b.is_active,
@@ -274,9 +287,8 @@ export default function ListaEntidades() {
     },
   ];
 
-  const genericColumns: Column<
-    Employee | Bank | (typeof zoneEntities)[number] | OtherEntity
-  >[] = [
+  interface ZoneRow { id:string; name:string; code:string; balance:number; caidaAcumulada:number; prestamo:number; }
+  const genericColumns: Column<Employee | Bank | ZoneRow | OtherEntity>[] = [
     {
       key: "name",
       header: "Nombre",
@@ -455,7 +467,10 @@ export default function ListaEntidades() {
         </div>
       </motion.div>
       <AnimatePresence>
-        {showCrearModal&&<CrearEntidadModal key="crear" activeTab={activeTab} onClose={()=>setShowCrearModal(false)}/>}
+        {showCrearModal&&<CrearEntidadModal key="crear" activeTab={activeTab}
+          onClose={()=>setShowCrearModal(false)}
+          onCreated={()=>{ fetchBancas(); fetchZonas(); }}
+        />}
       </AnimatePresence>
 
       {/* ── Edit Modal ─────────────────────────────────────────────────────── */}

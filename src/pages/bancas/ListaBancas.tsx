@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, ChevronDown, Loader2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import DataTable from "@/components/ui/DataTable";
-import { bettingPools, zones } from "@/data/mockData";
-import type { BettingPool } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
+import type { Banca } from "@/store/bancasStore";
+import { useBancasStore } from "@/store/bancasStore";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -20,81 +21,80 @@ const containerVariants = {
 const pageSizeOptions = [10, 25, 50, 100];
 
 export default function ListaBancas() {
-  const [search, setSearch] = useState("");
-  const [selectedZones, setSelectedZones] = useState<string[]>([]);
-  const [pageSize, setPageSize] = useState(10);
-  const [activeToggles, setActiveToggles] = useState<Record<string, boolean>>(() => {
-    const map: Record<string, boolean> = {};
-    bettingPools.forEach((bp) => {
-      map[bp.id] = bp.isActive;
-    });
-    return map;
-  });
+  const { bancas, zonas, bancasLoading } = useBancasZonas();
+  const { updateBanca } = useBancasStore();
 
+  const [search, setSearch]               = useState("");
+  const [selectedZones, setSelectedZones] = useState<string[]>([]);
+  const [pageSize, setPageSize]           = useState(10);
   const [showZoneDropdown, setShowZoneDropdown] = useState(false);
+  // local toggle state mirrors is_active; updates Supabase on click
+  const [activeToggles, setActiveToggles] = useState<Record<string, boolean>>({});
+
+  // Merge Supabase is_active with any local override
+  const isActive = (b: Banca): boolean =>
+    activeToggles[b.id] !== undefined ? activeToggles[b.id] : b.is_active;
 
   const filteredData = useMemo(() => {
-    return bettingPools.filter((bp) => {
+    return bancas.filter((bp) => {
       const matchesSearch =
         search === "" ||
         bp.name.toLowerCase().includes(search.toLowerCase()) ||
-        bp.mwrCode.toLowerCase().includes(search.toLowerCase()) ||
+        bp.mwr_code.toLowerCase().includes(search.toLowerCase()) ||
         bp.code.toLowerCase().includes(search.toLowerCase());
       const matchesZone =
-        selectedZones.length === 0 || selectedZones.includes(bp.zoneId);
+        selectedZones.length === 0 ||
+        selectedZones.includes(bp.zone_id ?? "") ||
+        selectedZones.includes(bp.zone_name ?? "");
       return matchesSearch && matchesZone;
     });
-  }, [search, selectedZones]);
+  }, [search, selectedZones, bancas]);
 
-  const togglePool = (id: string) => {
-    setActiveToggles((prev) => ({ ...prev, [id]: !prev[id] }));
+  const togglePool = async (b: Banca) => {
+    const newVal = !isActive(b);
+    setActiveToggles((prev) => ({ ...prev, [b.id]: newVal }));
+    await updateBanca(b.id, { is_active: newVal });
   };
 
   const formatCurrency = (val: number) => {
     if (val === 0) return "$0.00";
-    return val.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-    });
+    return val.toLocaleString("en-US", { style: "currency", currency: "USD" });
   };
 
   const columns = [
     {
       key: "numero",
       header: "Numero",
-      accessor: (_row: BettingPool) => 0,
+      accessor: (_row: Banca) => 0,
       sortable: false,
       align: "center" as const,
       width: "60px",
-      cell: (_row: BettingPool, idx?: number) => (
-        <span className="font-medium text-[#666666]">{((idx ?? 0) + 1)}</span>
+      cell: (_row: Banca, idx?: number) => (
+        <span className="font-medium text-[#666666]">{(idx ?? 0) + 1}</span>
       ),
     },
     {
       key: "nombre",
       header: "Nombre",
-      accessor: (row: BettingPool) => row.name,
+      accessor: (row: Banca) => row.name,
       sortable: true,
     },
     {
       key: "referencia",
       header: "Referencia",
-      accessor: (row: BettingPool) => row.mwrCode,
+      accessor: (row: Banca) => row.mwr_code,
       sortable: true,
-      cell: (row: BettingPool) => (
-        <span className="font-mono text-[13px] text-[#666666]">{row.mwrCode}</span>
+      cell: (row: Banca) => (
+        <span className="font-mono text-[13px] text-[#666666]">{row.mwr_code}</span>
       ),
     },
     {
       key: "usuarios",
       header: "Usuarios",
-      accessor: (row: BettingPool) => row.code,
+      accessor: (row: Banca) => row.code,
       sortable: true,
-      cell: (row: BettingPool) => (
-        <a
-          href={`#/pool-users`}
-          className="text-[#4ECDC4] hover:underline font-medium"
-        >
+      cell: (row: Banca) => (
+        <a href="#/pool-users" className="text-[#4ECDC4] hover:underline font-medium">
           {row.code}
         </a>
       ),
@@ -102,22 +102,19 @@ export default function ListaBancas() {
     {
       key: "activa",
       header: "Activa",
-      accessor: (row: BettingPool) => (activeToggles[row.id] ? "Si" : "No"),
+      accessor: (row: Banca) => (isActive(row) ? "Si" : "No"),
       sortable: false,
       align: "center" as const,
-      cell: (row: BettingPool) => (
+      cell: (row: Banca) => (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            togglePool(row.id);
-          }}
+          onClick={(e) => { e.stopPropagation(); togglePool(row); }}
           className={`relative inline-flex h-[22px] w-10 items-center rounded-full transition-colors duration-200 ${
-            activeToggles[row.id] ? "bg-[#4ECDC4]" : "bg-[#E5E5E0]"
+            isActive(row) ? "bg-[#4ECDC4]" : "bg-[#E5E5E0]"
           }`}
         >
           <span
             className={`inline-block h-[18px] w-[18px] transform rounded-full bg-white shadow transition-transform duration-200 ${
-              activeToggles[row.id] ? "translate-x-5" : "translate-x-0.5"
+              isActive(row) ? "translate-x-5" : "translate-x-0.5"
             }`}
           />
         </button>
@@ -126,34 +123,24 @@ export default function ListaBancas() {
     {
       key: "zona",
       header: "Zona",
-      accessor: (row: BettingPool) => row.zoneName,
+      accessor: (row: Banca) => row.zone_name ?? "—",
       sortable: true,
-      cell: (row: BettingPool) => (
-        <span
-          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            row.zoneName === "SFM"
-              ? "bg-amber-100 text-amber-800"
-              : "bg-gray-100 text-gray-700"
-          }`}
-        >
-          {row.zoneName}
+      cell: (row: Banca) => (
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#E0F7F5] text-[#0F766E]">
+          {row.zone_name ?? "—"}
         </span>
       ),
     },
     {
       key: "balance",
       header: "Balance",
-      accessor: (row: BettingPool) => row.balance,
+      accessor: (row: Banca) => row.balance,
       sortable: true,
       align: "right" as const,
-      cell: (row: BettingPool) => (
+      cell: (row: Banca) => (
         <span
           className={`font-mono text-[13px] ${
-            row.balance > 0
-              ? "text-green-600"
-              : row.balance < 0
-              ? "text-red-600"
-              : "text-[#999999]"
+            row.balance > 0 ? "text-green-600" : row.balance < 0 ? "text-red-600" : "text-[#999999]"
           }`}
         >
           {formatCurrency(row.balance)}
@@ -179,12 +166,7 @@ export default function ListaBancas() {
   ];
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-5"
-    >
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-5">
       <PageHeader
         title="Bancas"
         subtitle="Lista de todas las bancas registradas en el sistema"
@@ -213,11 +195,11 @@ export default function ListaBancas() {
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute top-full left-0 mt-1 bg-white border border-[#E5E5E0] rounded-lg shadow-lg z-20 min-w-[160px] py-1"
               >
-                {zones.map((z) => (
-                  <label
-                    key={z.id}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-[#F5F5F0] cursor-pointer text-sm"
-                  >
+                {zonas.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-[#999]">Sin zonas</p>
+                )}
+                {zonas.map((z) => (
+                  <label key={z.id} className="flex items-center gap-2 px-3 py-2 hover:bg-[#F5F5F0] cursor-pointer text-sm">
                     <input
                       type="checkbox"
                       checked={selectedZones.includes(z.id)}
@@ -230,7 +212,7 @@ export default function ListaBancas() {
                       }}
                       className="rounded border-gray-300 text-[#4ECDC4] focus:ring-[#4ECDC4]"
                     />
-                    <span>{z.name}</span>
+                    <span>{z.nombre}</span>
                   </label>
                 ))}
               </motion.div>
@@ -242,14 +224,14 @@ export default function ListaBancas() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999]" />
             <input
               type="text"
-              placeholder="Buscar por nombre, referencia, usuario..."
+              placeholder="Buscar por nombre, referencia..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)]"
             />
           </div>
 
-          {/* Entradas por pagina */}
+          {/* Page size */}
           <div className="flex items-center gap-2 text-sm text-[#666666]">
             <span>Entradas por pagina:</span>
             <select
@@ -265,20 +247,30 @@ export default function ListaBancas() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <DataTable
-          columns={columns}
-          data={filteredData}
-          keyExtractor={(row) => row.id}
-          pageSize={pageSize}
-          pageSizeOptions={pageSizeOptions}
-          emptyMessage="No se encontraron bancas"
-        />
-        <div className="mt-3 text-sm text-[#999999]">
-          {filteredData.length} entradas encontradas
+      {/* Loading */}
+      {bancasLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-[#4ECDC4]" />
+          <span className="ml-2 text-sm text-[#999]">Cargando bancas...</span>
         </div>
-      </div>
+      )}
+
+      {/* Table */}
+      {!bancasLoading && (
+        <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <DataTable
+            columns={columns}
+            data={filteredData}
+            keyExtractor={(row) => row.id}
+            pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
+            emptyMessage="No se encontraron bancas"
+          />
+          <div className="mt-3 text-sm text-[#999999]">
+            {filteredData.length} entradas encontradas
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

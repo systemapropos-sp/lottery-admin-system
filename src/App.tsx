@@ -115,6 +115,7 @@ import ContabilidadPage from "@/pages/contabilidad/ContabilidadPage";
 // ─── Préstamos ───────────────────────────────────────────────────────────────────
 import PrestamosPage from "@/pages/prestamos/PrestamosPage";
 import InstallPWA from "@/components/InstallPWA";
+import { BancasZonasProvider } from "@/context/BancasZonasContext";
 
 // ─── Cobradores ──────────────────────────────────────────────────────────────────
 import CobraHub from "@/pages/cobradores/CobraHub";
@@ -226,7 +227,7 @@ function AutoLoginCheck() {
 
 export default function App() {
   return (
-    <>
+    <BancasZonasProvider>
       {/* AutoLoginCheck runs outside Routes so it fires on EVERY path */}
       <AutoLoginCheck />
       {/* PWA install banner */}
@@ -382,6 +383,6 @@ export default function App() {
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </>
+    </BancasZonasProvider>
   );
 }

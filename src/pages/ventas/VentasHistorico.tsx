@@ -1,33 +1,16 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, ChevronDown, Search, X } from "lucide-react";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 const fmt = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
-const BANCAS = [
-  { id:"b1",  ref:"MATADOR-SPORT", codigo:"MWR-0001" },
-  { id:"b2",  ref:"MMW RD 02",     codigo:"MWR-0002" },
-  { id:"b3",  ref:"MMW RD 03",     codigo:"MWR-0003" },
-  { id:"b4",  ref:"MMW RD 04",     codigo:"MWR-0004" },
-  { id:"b5",  ref:"MMW RD 05",     codigo:"MWR-0005" },
-  { id:"b6",  ref:"MMW RD 06",     codigo:"MWR-0006" },
-  { id:"b7",  ref:"MMW RD 07",     codigo:"MWR-0007" },
-  { id:"b8",  ref:"MMW RD 08",     codigo:"MWR-0008" },
-  { id:"b9",  ref:"MMW RD 09",     codigo:"MWR-0009" },
-  { id:"b10", ref:"MMW RD 10",     codigo:"MWR-0010" },
-  { id:"b11", ref:"MMW RD 11",     codigo:"MWR-0011" },
-  { id:"b12", ref:"MMW RD 12",     codigo:"MWR-0012" },
-  { id:"b13", ref:"MMW RD 13",     codigo:"MWR-0013" },
-];
-const ZONAS  = [{ id:"z1", nombre:"Default" }, { id:"z2", nombre:"SFM" }];
 const SORTEOS = ["LA PRIMERA 7PM","FLORIDA PM","LOTEKA","LA SUERTE","LA PRIMERA","GANA MAS","QUINIELA REAL","SUPER PALE REAL-GANA MAS","Anguila 10AM","NEW YORK AM","Anguila 6PM","SUPER PALE NACIONAL-QP","NACIONAL","NEW YORK PM","Anguila 9PM","Anguila 1PM","LA SUERTE 6:00pm","QUINIELA PALE","FLORIDA AM","LOTEDOM","REAL","LOTO POOL","MEGA CHANCES","SUPER PALE PALE"];
 
 type Pill = "TODOS"|"CON VENTAS"|"CON PREMIOS"|"CON TICKETS PENDIENTES"|"CON VENTAS NETAS NEGATIVAS"|"CON VENTAS NETAS POSITIVAS";
 const PILLS: Pill[] = ["TODOS","CON VENTAS","CON PREMIOS","CON TICKETS PENDIENTES","CON VENTAS NETAS NEGATIVAS","CON VENTAS NETAS POSITIVAS"];
 
 interface Row { id:string; ref:string; codigo:string; venta:number; comisiones:number; premios:number; neto:number; balance:number; ticketsPend:number; }
-const baseRows: Row[] = BANCAS.map((b) => ({ id:b.id, ref:b.ref, codigo:b.codigo, venta:0, comisiones:0, premios:0, neto:0, balance:0, ticketsPend:0 }));
-
 function applyPill(rows: Row[], pill: Pill): Row[] {
   switch(pill){
     case "CON VENTAS": return rows.filter((r)=>r.venta>0);
@@ -39,7 +22,6 @@ function applyPill(rows: Row[], pill: Pill): Row[] {
   }
 }
 const netoCell = (n:number) => <span className={`font-semibold ${n<0?"text-[#EF4444]":n>0?"text-[#22C55E]":"text-[#999]"}`}>{fmt(n)}</span>;
-
 function DateInput({label,value,onChange}:{label:string;value:string;onChange:(v:string)=>void}) {
   return <div className="flex flex-col gap-1"><label className="text-xs text-[#999]">{label}</label><input type="date" value={value} onChange={(e)=>onChange(e.target.value)} className="px-3 py-1.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#14B8A6] transition-colors"/></div>;
 }
@@ -73,8 +55,12 @@ function TotalBadge({label,amount}:{label:string;amount:number}) {
 }
 
 const HEADERS = ["Ref.","Código","Venta","Comisiones","Premios","Neto","Balance"];
-
 export default function VentasHistorico() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name ?? "", codigo: b.code ?? "" }));
+  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
+  const baseRows: Row[] = BANCAS.map((b) => ({ id:b.id, ref:b.ref, codigo:b.codigo, venta:0, comisiones:0, premios:0, neto:0, balance:0, ticketsPend:0 }));
+
   const [fi,setFi] = useState(()=>{ const d=new Date(); d.setDate(d.getDate()-30); return d.toISOString().slice(0,10); });
   const [ff,setFf] = useState(new Date().toISOString().slice(0,10));
   const [pill,setPill] = useState<Pill>("TODOS");
@@ -88,7 +74,7 @@ export default function VentasHistorico() {
     const byPill = applyPill(baseRows, pill);
     const q = quick.toLowerCase();
     return q ? byPill.filter(r=>r.ref.toLowerCase().includes(q)||r.codigo.toLowerCase().includes(q)) : byPill;
-  },[pill,quick]);
+  },[pill,quick,baseRows]);
 
   const totals = useMemo(()=>filtered.reduce((a,r)=>({...a,venta:a.venta+r.venta,comisiones:a.comisiones+r.comisiones,premios:a.premios+r.premios,neto:a.neto+r.neto,balance:a.balance+r.balance}),{venta:0,comisiones:0,premios:0,neto:0,balance:0}),[filtered]);
 
