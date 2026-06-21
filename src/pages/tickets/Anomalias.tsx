@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { AlertTriangle, Calendar } from "lucide-react";
 import DataTable from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
-import { lotteries } from "@/data/mockData";
 
 interface AnomalyTicket {
   id: string;
@@ -26,29 +25,9 @@ interface ResultChange {
   nuevo: string;
 }
 
-function generateAnomalies(): AnomalyTicket[] {
-  return [
-    { id: "anom-001", numero: "TK-240515-0099", fecha: "2024-05-15T14:30:00Z", banca: "MWR-0001", monto: 25000.00, tipo: "Monto inusual", descripcion: "Monto significativamente mayor al promedio de la banca", severidad: "alta" },
-    { id: "anom-002", numero: "TK-240515-0105", fecha: "2024-05-15T14:31:00Z", banca: "MWR-0001", monto: 25000.00, tipo: "Ticket duplicado", descripcion: "Mismo numero, monto y fecha que TK-240515-0099", severidad: "alta" },
-    { id: "anom-003", numero: "TK-240515-0150", fecha: "2024-05-15T10:15:00Z", banca: "MWR-0003", monto: 15000.00, tipo: "Secuencia rapida", descripcion: "5 tickets creados en menos de 2 minutos", severidad: "media" },
-    { id: "anom-004", numero: "TK-240515-0200", fecha: "2024-05-15T16:45:00Z", banca: "MWR-0005", monto: 8000.00, tipo: "Cancelacion sospechosa", descripcion: "Ticket cancelado despues del sorteo", severidad: "media" },
-    { id: "anom-005", numero: "TK-240514-0080", fecha: "2024-05-14T09:00:00Z", banca: "MWR-0002", monto: 5000.00, tipo: "Monto inusual", descripcion: "Monto excede el limite configurado", severidad: "baja" },
-    { id: "anom-006", numero: "TK-240514-0120", fecha: "2024-05-14T11:20:00Z", banca: "MWR-0007", monto: 12000.00, tipo: "Secuencia rapida", descripcion: "10 tickets con numeros consecutivos", severidad: "alta" },
-    { id: "anom-007", numero: "TK-240513-0055", fecha: "2024-05-13T13:10:00Z", banca: "MWR-0010", monto: 18000.00, tipo: "Monto inusual", descripcion: "Supera el 200% del promedio diario", severidad: "media" },
-    { id: "anom-008", numero: "TK-240513-0078", fecha: "2024-05-13T15:30:00Z", banca: "MWR-0015", monto: 9500.00, tipo: "Cancelacion sospechosa", descripcion: "Cancelacion masiva de tickets ganadores", severidad: "alta" },
-  ];
-}
-
-function generateResultChanges(): ResultChange[] {
-  return [
-    { id: "chg-001", fecha: "2024-05-15T10:15:00Z", sorteo: "Anguila 10AM", usuario: "mmwrduser", accion: "Modifico", anterior: "12-34-56", nuevo: "12-34-57" },
-    { id: "chg-002", fecha: "2024-05-15T10:20:00Z", sorteo: "Anguila 10AM", usuario: "mmwrduser", accion: "Modifico", anterior: "12-34-57", nuevo: "12-34-58" },
-    { id: "chg-003", fecha: "2024-05-15T13:10:00Z", sorteo: "LOTEDOM", usuario: "sfm056", accion: "Creo", anterior: "-", nuevo: "44-55-66" },
-    { id: "chg-004", fecha: "2024-05-14T18:30:00Z", sorteo: "Anguila 6PM", usuario: "mmwrduser", accion: "Bloqueo", anterior: "45-67-89", nuevo: "45-67-89" },
-    { id: "chg-005", fecha: "2024-05-14T21:05:00Z", sorteo: "Anguila 9PM", usuario: "vale", accion: "Modifico", anterior: "01-02-03", nuevo: "01-02-04" },
-    { id: "chg-006", fecha: "2024-05-13T10:30:00Z", sorteo: "LA PRIMERA", usuario: "mmwrduser", accion: "Creo", anterior: "-", nuevo: "11-22-33" },
-  ];
-}
+// Datos reales de anomalías y cambios vendrán de Supabase
+function generateAnomalies(): AnomalyTicket[] { return []; }
+function generateResultChanges(): ResultChange[] { return []; }
 
 const severidadConfig = {
   alta: "bg-red-100 text-red-800 border-l-4 border-red-500",
@@ -183,7 +162,6 @@ export default function Anomalias() {
             <select value={selectedSorteo} onChange={(e) => setSelectedSorteo(e.target.value)}
               className="px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] focus:ring-[0_0_0_3px_rgba(78,205,196,0.15)] transition-colors">
               <option value="">Todos</option>
-              {lotteries.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
             </select>
           </div>
         </div>

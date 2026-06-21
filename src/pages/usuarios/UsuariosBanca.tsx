@@ -2,19 +2,20 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown, Eye, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { bettingPools, zones } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 export default function UsuariosBanca() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [pageSize, setPageSize] = useState(10);
   const [showZoneDropdown, setShowZoneDropdown] = useState(false);
 
   const filteredPools = useMemo(() => {
-    if (selectedZones.length === 0) return bettingPools;
-    return bettingPools.filter((bp) => selectedZones.includes(bp.zoneId));
-  }, [selectedZones]);
+    if (selectedZones.length === 0) return bancasRaw;
+    return bancasRaw.filter((bp) => selectedZones.includes(bp.zone_id ?? ""));
+  }, [bancasRaw, selectedZones]);
 
   return (
     <motion.div
@@ -47,7 +48,7 @@ export default function UsuariosBanca() {
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute top-full left-0 mt-1 bg-white border border-[#E5E5E0] rounded-lg shadow-lg z-20 min-w-[160px] py-1"
               >
-                {zones.map((z) => (
+                {zonasRaw.map((z) => (
                   <label key={z.id} className="flex items-center gap-2 px-3 py-2 hover:bg-[#F5F5F0] cursor-pointer text-sm">
                     <input
                       type="checkbox"
@@ -61,7 +62,7 @@ export default function UsuariosBanca() {
                       }}
                       className="rounded border-gray-300 text-[#4ECDC4] focus:ring-[#4ECDC4]"
                     />
-                    <span>{z.name}</span>
+                    <span>{z.nombre}</span>
                   </label>
                 ))}
               </motion.div>
@@ -114,7 +115,7 @@ export default function UsuariosBanca() {
                       {bp.name}
                     </a>
                   </td>
-                  <td className="px-4 py-3 font-mono text-[13px] text-[#666666]">{bp.mwrCode}</td>
+                  <td className="px-4 py-3 font-mono text-[13px] text-[#666666]">{bp.mwr_code}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <button className="p-1.5 rounded-md hover:bg-[rgba(78,205,196,0.1)] text-[#666666] hover:text-[#4ECDC4] transition-colors">

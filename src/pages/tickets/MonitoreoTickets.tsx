@@ -2,38 +2,16 @@ import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, ChevronDown, FileText, Printer } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 function fmt(n:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(n);}
 function today(){return new Date().toISOString().split("T")[0];}
 
 const SORTEOS_LIST=["Anguila 10AM","GANA MAS","LA PRIMERA","NEW YORK AM","FLORIDA AM","QUINIELA REAL","LOTEKA","LA SUERTE"];
-const ZONAS_LIST=["Default","SFM"];
 
-// Mock directo: 00-99 with amounts (some red = over limit, some 0 = grey)
-const DIRECTO_DATA=Array.from({length:100},(_,i)=>{
-  const table:{[k:number]:number}={4:995,8:190,14:325,15:370,17:365,18:640,23:285,24:210,
-    25:155,26:205,27:150,28:225,29:115,30:300,31:195,32:355,40:400,41:125,42:90,44:55,
-    45:145,46:100,47:40,48:15,49:65,50:175,51:20,52:200,53:5,54:75,55:35,56:125,57:15,
-    58:345,59:15,60:100,61:500,62:15,63:95,64:125,65:25,66:80,68:25,69:175,70:50,71:75,
-    72:65,73:300,74:15,75:5,76:100,80:50,81:675,82:5,83:280,84:25,85:15,86:100,87:190,
-    88:190,89:190,90:50,91:25,92:265,93:125,94:170,95:105,96:200,97:15,98:75,99:100,
-    0:135,1:25,2:55,3:15,5:175,6:60,7:200,9:15,10:195,11:100,12:175,13:225,16:70,
-    19:120,20:160,21:125,22:215};
-  return {num:String(i).padStart(2,"0"),amt:table[i]??0};
-});
-
-const PALE_DATA=[
-  {num:"19-79",amt:350},{num:"11-70",amt:200},{num:"14-23",amt:200},{num:"22-73",amt:200},
-  {num:"04-40",amt:175},{num:"37-73",amt:135},{num:"00-87",amt:100},{num:"04-61",amt:100},
-  {num:"07-27",amt:100},{num:"08-30",amt:100},{num:"10-27",amt:100},{num:"13-76",amt:100},
-  {num:"18-40",amt:100},{num:"19-48",amt:100},{num:"19-56",amt:100},{num:"19-65",amt:100},
-  {num:"19-83",amt:100},
-];
-const TRIP_DATA=[
-  {num:"13-19-58",amt:50},{num:"19-56-83",amt:50},{num:"19-65-83",amt:50},
-  {num:"30-69-76",amt:25},{num:"56-64-94",amt:20},{num:"03-34-37",amt:5},
-  {num:"05-37-73",amt:5},{num:"28-58-94",amt:5},{num:"28-58-95",amt:5},{num:"37-42-79",amt:5},
-];
+const DIRECTO_DATA: { num: string; amt: number }[] = [];
+const PALE_DATA:    { num: string; amt: number }[] = [];
+const TRIP_DATA:    { num: string; amt: number }[] = [];
 
 // Limit threshold for red highlight
 const LIMIT = 500;
@@ -45,6 +23,7 @@ const chunkDir=(arr:{num:string;amt:number}[],size:number)=>{
 };
 
 export default function MonitoreoTickets(){
+  const { zonas, bancas } = useBancasZonas();
   const [fecha,setFecha]=useState(today());
   const [sorteo,setSorteo]=useState("Anguila 10AM");
   const [selZonas,setSelZonas]=useState<string[]>([]);
@@ -128,8 +107,8 @@ export default function MonitoreoTickets(){
           <label className="text-xs text-[#999] font-medium block mb-1">Zonas</label>
           <div className="relative">
             <select className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg appearance-none focus:outline-none focus:border-[#4ECDC4] pr-8 min-w-[160px]">
-              <option>{selZonas.length||ZONAS_LIST.length} seleccionadas</option>
-              {ZONAS_LIST.map(z=><option key={z} value={z}>{z}</option>)}
+              <option>{selZonas.length||zonas.length} seleccionadas</option>
+              {zonas.map(z=><option key={z.id} value={z.nombre}>{z.nombre}</option>)}
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none"/>
           </div>

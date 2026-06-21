@@ -47,6 +47,19 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      external: [],
+    },
+    // Ensure template literals get properly minified to avoid multi-line issues
+    minify: 'esbuild',
+  },
+  esbuild: {
+    legalComments: 'none',
+    minifyWhitespace: true,
+    minifySyntax: true,
+    minifyIdentifiers: false,
+  },
   server: {
     port: 3000,
   },

@@ -1,290 +1,246 @@
-import { useState, useMemo } from "react";
+// @ts-nocheck
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { FileText, Download, Filter, Calendar } from "lucide-react";
+import { RefreshCw, Search, Download, Inbox } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import DataTable from "@/components/ui/DataTable";
-import type { Column } from "@/components/ui/DataTable";
-import { useBancasZonas } from "@/context/BancasZonasContext";
+import { supabase, BUSINESS_ID } from "@/lib/supabase";
+import { useBancasStore } from "@/store/bancasStore";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const TIPOS_ENTIDAD = [
-  "BANCA",
-  "BANCO",
-  "CAIDA ACUMULADA",
-  "CLIENTE PERSONAL",
-  "EMPLEADO",
-  "GRUPO",
-  "OTROS",
-  "SISTEMA",
-  "ZONA",
-] as const;
+const today = new Date().toISOString().split("T")[0];
+const weekAgo = new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0];
 
 const TIPOS_TRANSACCION = [
-  "AJUSTE",
-  "AJUSTE DE COMISION",
-  "BALANCE INICIAL",
-  "CAIDA",
-  "CAIDA ACUMULADA",
-  "COBRO",
-  "CANCELAR RECARGA DE CLIENTE PERSONAL",
-  "COBRO DE EMPLEADO",
-  "COBRO DE PRESTAMOS",
-  "CONSUMO AUTOMATICO DE BANCA",
-  "GASTOS",
-  "GASTO AUTOMATICO DE GRUPO",
-  "INTERBANCARIO",
-  "PAGO",
-  "PAGO AUTOMATICO DE EMPLEADO",
-  "PAGO DE EMPLEADO",
-  "PREMIO CANCELADO",
-  "PREMIO TRANSFERIDO",
-  "RECARGA DE CLIENTE PERSONAL",
-  "RETIRO",
-  "RESULTADOS DE VENTA",
-  "RETIRO DE CLIENTE PERSONAL",
-  "RETORNO DE TICKET EXPIRADO",
-  "SNAPSHOT",
-  "TRANSFERENCIA",
+  "AJUSTE","AJUSTE DE COMISION","BALANCE INICIAL","CAIDA","CAIDA ACUMULADA",
+  "COBRO","CANCELAR RECARGA DE CLIENTE PERSONAL","COBRO DE EMPLEADO",
+  "COBRO DE PRESTAMOS","CONSUMO AUTOMATICO DE BANCA","GASTOS",
+  "GASTO AUTOMATICO DE GRUPO","INTERBANCARIO","PAGO","PAGO AUTOMATICO DE EMPLEADO",
+  "PAGO DE EMPLEADO","PREMIO CANCELADO","PREMIO TRANSFERIDO",
+  "RECARGA DE CLIENTE PERSONAL","RETIRO","RESULTADOS DE VENTA",
+  "RETIRO DE CLIENTE PERSONAL","RETORNO DE TICKET EXPIRADO","SNAPSHOT","TRANSFERENCIA",
 ] as const;
 
-// Entidades base (parte fija — no depende de Supabase)
-const ENTIDADES_BASE: Omit<Record<string, string[]>, "BANCA" | "ZONA"> = {
-  "BANCO":            ["Banco Popular", "BanReservas", "Scotiabank", "Banco BHD", "Banistmo"],
-  "CAIDA ACUMULADA":  ["Caída Acumulada General", "Caída Zona Norte", "Caída Zona Sur"],
-  "CLIENTE PERSONAL": [],
-  "EMPLEADO":         [],
-  "GRUPO":            [],
-  "OTROS":            ["Gastos Misceláneos", "Fondo Reserva", "Otros"],
-  "SISTEMA":          ["Sistema NMV", "Proceso Automático", "Cierre Diario"],
-};
+const TIPOS_ENTIDAD = ["BANCA","BANCO","CAIDA ACUMULADA","CLIENTE PERSONAL","EMPLEADO","GRUPO","OTROS","SISTEMA","ZONA"] as const;
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface TransaccionRow {
-  id: string;
-  concepto: string;
-  fecha: string;
-  hora: string;
-  creadoPor: string;
-  entidad1: string;
-  entidad2: string;
-  saldoIni1: number;
-  saldoIni2: number;
-  debito: number;
-  credito: number;
-  saldoFin1: number;
-  saldoFin2: number;
-  notas: string;
-  tipo: string;
-  categoria: string;
-}
-
-// ─── Componente ───────────────────────────────────────────────────────────────
+const fmt = (n: number) => `$${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 export default function ListaTransacciones() {
-  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
-
-  // Entidades dinámicas — BANCA y ZONA vienen de Supabase
-  const entidadesPorTipo: Record<string, string[]> = useMemo(() => ({
-    ...ENTIDADES_BASE,
-    "BANCA": bancasRaw.map(b => b.name),
-    "ZONA":  zonasRaw.map(z => z.nombre),
-  }), [bancasRaw, zonasRaw]);
-
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const { bancas } = useBancasStore();
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [desde, setDesde] = useState(weekAgo);
+  const [hasta, setHasta] = useState(today);
   const [tipoEntidad, setTipoEntidad] = useState("");
   const [entidad, setEntidad] = useState("");
-  const [tipoTransaccion, setTipoTransaccion] = useState("");
+  const [tipoTx, setTipoTx] = useState("");
   const [creadoPor, setCreadoPor] = useState("");
-  const [showNotas, setShowNotas] = useState(false);
+  const [search, setSearch] = useState("");
+  const [perPage, setPerPage] = useState(25);
 
-  // ── Datos base (vacío hasta que se conecte Supabase) ──────────────────────
-  const allData: TransaccionRow[] = [];
+  const load = async () => {
+    setLoading(true);
+    try {
+      let q = supabase
+        .from("accountable_transactions")
+        .select("*")
+        .eq("business_id", BUSINESS_ID)
+        .gte("date", desde)
+        .lte("date", hasta)
+        .order("date", { ascending: false })
+        .limit(500);
+      if (tipoTx) q = q.eq("type", tipoTx);
+      if (creadoPor.trim()) q = q.ilike("created_by", `%${creadoPor.trim()}%`);
+      const { data } = await q;
+      setRows(data || []);
+    } catch { setRows([]); }
+    finally { setLoading(false); }
+  };
 
-  // ── Entidades disponibles según tipo seleccionado ─────────────────────────
-  const entidadesDisponibles = useMemo(() => {
-    if (!tipoEntidad) return bancasRaw.map(b => b.name);
-    return entidadesPorTipo[tipoEntidad] ?? [];
-  }, [tipoEntidad, entidadesPorTipo, bancasRaw]);
+  useEffect(() => { load(); }, []);
 
-  // Resetear entidad al cambiar tipo
-  function handleTipoEntidadChange(val: string) {
-    setTipoEntidad(val);
-    setEntidad(""); // Clear cascading selection
-  }
-
-  // ── Filtrado ───────────────────────────────────────────────────────────────
-  const filteredData = useMemo(() => {
-    return allData.filter((row) => {
-      if (startDate) {
-        const parts = row.fecha.split("/");
-        const rowDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-        if (rowDate < new Date(startDate)) return false;
-      }
-      if (endDate) {
-        const parts = row.fecha.split("/");
-        const rowDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-        if (rowDate > new Date(endDate)) return false;
-      }
-      if (entidad && !row.entidad1.toLowerCase().includes(entidad.toLowerCase())) return false;
-      if (tipoTransaccion && row.tipo !== tipoTransaccion) return false;
-      if (creadoPor && row.creadoPor !== creadoPor) return false;
-      return true;
-    });
-  }, [allData, startDate, endDate, entidad, tipoTransaccion, creadoPor]);
-
-  // ── Usuarios únicos ────────────────────────────────────────────────────────
-  const uniqueUsers: string[] = [];
-
-  // ── Columnas ───────────────────────────────────────────────────────────────
-  const columns = useMemo<Column<TransaccionRow>[]>(() => {
-    const fmt = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-    const baseCols: Column<TransaccionRow>[] = [
-      { key: "concepto",   header: "Concepto",     accessor: (r) => r.concepto,   sortable: true },
-      { key: "fecha",      header: "Fecha",         accessor: (r) => r.fecha,      sortable: true },
-      { key: "hora",       header: "Hora",          accessor: (r) => r.hora,       sortable: true },
-      { key: "creadoPor",  header: "Creado por",    accessor: (r) => r.creadoPor,  sortable: true },
-      { key: "entidad1",   header: "Entidad #1",    accessor: (r) => r.entidad1,   sortable: true },
-      { key: "entidad2",   header: "Entidad #2",    accessor: (r) => r.entidad2,   sortable: true },
-      { key: "saldoIni1",  header: "Saldo ini #1",  accessor: (r) => r.saldoIni1,  sortable: true, align: "right", formatter: (_v, r) => fmt(r.saldoIni1) },
-      { key: "saldoIni2",  header: "Saldo ini #2",  accessor: (r) => r.saldoIni2,  sortable: true, align: "right", formatter: (_v, r) => fmt(r.saldoIni2) },
-      {
-        key: "debito", header: "Debito", accessor: (r) => r.debito, sortable: true, align: "right",
-        cell: (r) => <span className="text-[#EF4444] font-medium">{r.debito > 0 ? `-${fmt(r.debito)}` : "-"}</span>,
-      },
-      {
-        key: "credito", header: "Credito", accessor: (r) => r.credito, sortable: true, align: "right",
-        cell: (r) => <span className="text-[#22C55E] font-medium">{r.credito > 0 ? `+${fmt(r.credito)}` : "-"}</span>,
-      },
-      { key: "saldoFin1",  header: "Saldo fin #1",  accessor: (r) => r.saldoFin1,  sortable: true, align: "right", formatter: (_v, r) => fmt(r.saldoFin1) },
-      { key: "saldoFin2",  header: "Saldo fin #2",  accessor: (r) => r.saldoFin2,  sortable: true, align: "right", formatter: (_v, r) => fmt(r.saldoFin2) },
-    ];
-    if (showNotas) {
-      baseCols.push({ key: "notas", header: "Notas", accessor: (r) => r.notas, sortable: false });
+  const filtered = useMemo(() => {
+    let r = rows;
+    if (tipoEntidad) r = r.filter(x => (x.entity_type || "").toUpperCase() === tipoEntidad);
+    if (entidad.trim()) r = r.filter(x =>
+      (x.entity_name || "").toLowerCase().includes(entidad.toLowerCase()) ||
+      (x.pool_name || "").toLowerCase().includes(entidad.toLowerCase())
+    );
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      r = r.filter(x =>
+        (x.entity_name || "").toLowerCase().includes(s) ||
+        (x.type || "").toLowerCase().includes(s) ||
+        (x.description || "").toLowerCase().includes(s) ||
+        (x.created_by || "").toLowerCase().includes(s) ||
+        String(x.amount || "").includes(s)
+      );
     }
-    return baseCols;
-  }, [showNotas]);
+    return r;
+  }, [rows, tipoEntidad, entidad, search]);
 
-  // ── Select CSS helper ──────────────────────────────────────────────────────
-  const selCls = "px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] transition-colors";
+  const paginated = filtered.slice(0, perPage);
+
+  const totDebit = filtered.filter(r => (r.amount || 0) < 0).reduce((s, r) => s + Math.abs(r.amount || 0), 0);
+  const totCredit = filtered.filter(r => (r.amount || 0) >= 0).reduce((s, r) => s + (r.amount || 0), 0);
+
+  const badgeClass = (type: string) => {
+    const t = (type || "").toUpperCase();
+    if (t === "COBRO" || t === "COBRO DE EMPLEADO") return "bg-green-100 text-green-700";
+    if (t === "PAGO" || t === "PAGO DE EMPLEADO") return "bg-red-100 text-red-600";
+    if (t === "AJUSTE") return "bg-blue-100 text-blue-700";
+    if (t === "GASTOS") return "bg-orange-100 text-orange-700";
+    return "bg-slate-100 text-slate-600";
+  };
 
   return (
-    <div className="min-h-[100dvh] p-6">
-      <PageHeader title="Transacciones" subtitle="Registro completo de movimientos financieros" />
+    <div className="p-4 md:p-6 space-y-5">
+      <PageHeader
+        title="Transacciones"
+        subtitle="Transacciones › Lista"
+        actions={
+          <button onClick={load} disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#14B8A6] to-[#0EA5E9] hover:brightness-105 disabled:opacity-60">
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Actualizar
+          </button>
+        }
+      />
 
-      {/* ── Filtros ── */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-6"
-      >
-        <div className="flex flex-wrap items-end gap-4">
-
-          {/* Desde */}
-          <div className="flex flex-col gap-1.5 min-w-[150px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Desde</label>
-            <div className="relative">
-              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999] pointer-events-none" />
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4]" />
-            </div>
+      {/* Filters */}
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-white border border-[#E8EDF2] rounded-2xl p-5 space-y-4"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div>
+            <label className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide block mb-1">Desde</label>
+            <input type="date" value={desde} onChange={e => setDesde(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6]" />
           </div>
-
-          {/* Hasta */}
-          <div className="flex flex-col gap-1.5 min-w-[150px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Hasta</label>
-            <div className="relative">
-              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999999] pointer-events-none" />
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4]" />
-            </div>
+          <div>
+            <label className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide block mb-1">Hasta</label>
+            <input type="date" value={hasta} onChange={e => setHasta(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6]" />
           </div>
-
-          {/* Tipo de Entidad */}
-          <div className="flex flex-col gap-1.5 min-w-[160px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Tipo de entidad</label>
-            <select value={tipoEntidad} onChange={(e) => handleTipoEntidadChange(e.target.value)} className={selCls}>
-              <option value="">— Todos —</option>
-              {TIPOS_ENTIDAD.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
+          <div>
+            <label className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide block mb-1">Tipo entidad</label>
+            <select value={tipoEntidad} onChange={e => setTipoEntidad(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6] bg-white">
+              <option value="">Todos</option>
+              {TIPOS_ENTIDAD.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
-
-          {/* Entidad (cascading) */}
-          <div className="flex flex-col gap-1.5 min-w-[180px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">
-              Entidad {tipoEntidad && <span className="text-teal-500 lowercase">({tipoEntidad.toLowerCase()})</span>}
-            </label>
-            <select value={entidad} onChange={(e) => setEntidad(e.target.value)} className={selCls}
-              disabled={!tipoEntidad}>
-      <option value="">— {tipoEntidad ? `Todas las ${tipoEntidad.toLowerCase()}s` : "Selecciona tipo primero"} —</option>
-              {entidadesDisponibles.map((ent) => (
-                <option key={ent} value={ent}>{ent}</option>
-              ))}
+          <div>
+            <label className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide block mb-1">Entidad</label>
+            <input value={entidad} onChange={e => setEntidad(e.target.value)} placeholder="Nombre..."
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6]" />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide block mb-1">Tipo tx</label>
+            <select value={tipoTx} onChange={e => setTipoTx(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6] bg-white">
+              <option value="">Todos</option>
+              {TIPOS_TRANSACCION.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
-
-          {/* Tipo de Transaccion */}
-          <div className="flex flex-col gap-1.5 min-w-[220px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Tipo de transaccion</label>
-            <select value={tipoTransaccion} onChange={(e) => setTipoTransaccion(e.target.value)} className={selCls}>
-              <option value="">— Todos —</option>
-              {TIPOS_TRANSACCION.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Creado por */}
-          <div className="flex flex-col gap-1.5 min-w-[150px]">
-            <label className="text-xs font-medium text-[#666666] uppercase tracking-wider">Creado por</label>
-            <select value={creadoPor} onChange={(e) => setCreadoPor(e.target.value)} className={selCls}>
-              <option value="">— Todos —</option>
-              {uniqueUsers.map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
+          <div>
+            <label className="text-[10px] font-bold text-[#64748B] uppercase tracking-wide block mb-1">Creado por</label>
+            <input value={creadoPor} onChange={e => setCreadoPor(e.target.value)} placeholder="Usuario..."
+              className="w-full px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6]" />
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={showNotas} onChange={(e) => setShowNotas(e.target.checked)} className="accent-[#4ECDC4] w-4 h-4 rounded" />
-            <span className="text-sm text-[#333333]">Mostrar notas</span>
-          </label>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setTipoEntidad(""); setEntidad(""); setTipoTransaccion(""); setCreadoPor(""); setStartDate(""); setEndDate(""); }}
-              className="px-4 py-2.5 text-sm text-[#666666] border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F5] transition-colors">
-              Limpiar
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[#4ECDC4] rounded-full hover:bg-[#3DBDB5] hover:shadow-[0_2px_8px_rgba(78,205,196,0.3)] transition-all">
-              <Filter size={14} />
-              Filtrar
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[#666666] bg-white border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F5] transition-colors">
-              <Download size={14} />
-              CSV
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[#666666] bg-white border border-[#E5E5E0] rounded-full hover:bg-[#F5F5F5] transition-colors">
-              <FileText size={14} />
-              PDF
-            </button>
-          </div>
-        </div>
+        <button onClick={load} disabled={loading}
+          className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#14B8A6] to-[#0EA5E9] hover:brightness-105 disabled:opacity-60">
+          Filtrar
+        </button>
       </motion.div>
 
-      {/* ── Tabla ── */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-        <DataTable
-          columns={columns}
-          data={filteredData}
-          keyExtractor={(r) => r.id}
-          pageSize={10}
-        />
+      {/* Table card */}
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+        className="bg-white border border-[#E8EDF2] rounded-2xl overflow-hidden"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#F1F5F9]">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#94A3B8]">Mostrando</span>
+            <select value={perPage} onChange={e => setPerPage(Number(e.target.value))}
+              className="px-2 py-1 text-xs border border-[#E2E8F0] rounded-lg bg-white">
+              {[10, 25, 50, 100].map(n => <option key={n}>{n}</option>)}
+            </select>
+            <span className="text-xs text-[#94A3B8]">entradas</span>
+          </div>
+          <div className="flex items-center gap-1.5 border border-[#E2E8F0] rounded-lg px-2 py-1">
+            <Search className="w-3.5 h-3.5 text-[#94A3B8]" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
+              className="text-xs focus:outline-none w-36" />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#0F172A]">
+                {["Fecha","Banca","Tipo","Descripción","Creado por","Débito","Crédito"].map(h => (
+                  <th key={h} className="py-3 px-4 text-left text-[10px] font-bold text-white whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="py-12 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-[#14B8A6] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-[#94A3B8]">Cargando...</span>
+                  </div>
+                </td></tr>
+              ) : paginated.length === 0 ? (
+                <tr><td colSpan={7} className="py-14 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Inbox className="w-8 h-8 text-[#CBD5E1]" />
+                    <p className="text-sm text-[#94A3B8]">No se encontraron transacciones</p>
+                  </div>
+                </td></tr>
+              ) : (
+                paginated.map((r, i) => {
+                  const isDebit = (r.amount || 0) < 0;
+                  return (
+                    <tr key={r.id || i} className={`border-b border-[#F8FAFC] hover:bg-[#F8FAFC] ${i % 2 === 0 ? "" : "bg-[#FAFAFA]"}`}>
+                      <td className="py-2.5 px-4 text-xs text-[#64748B] whitespace-nowrap">{r.date || "—"}</td>
+                      <td className="py-2.5 px-4 text-xs font-medium text-[#14B8A6]">{r.pool_name || r.entity_name || "—"}</td>
+                      <td className="py-2.5 px-4 text-xs">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${badgeClass(r.type)}`}>
+                          {r.type || "—"}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-4 text-xs text-[#64748B] max-w-[200px] truncate">{r.description || "—"}</td>
+                      <td className="py-2.5 px-4 text-xs text-[#94A3B8]">{r.created_by || "—"}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-red-500">{isDebit ? fmt(Math.abs(r.amount)) : "—"}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-green-600">{!isDebit ? fmt(r.amount) : "—"}</td>
+                    </tr>
+                  );
+                })
+              )}
+              {/* Totals */}
+              {!loading && paginated.length > 0 && (
+                <tr className="bg-[#1E293B]">
+                  <td colSpan={5} className="py-2.5 px-4 text-xs font-bold text-white">TOTALES ({filtered.length} transacciones)</td>
+                  <td className="py-2.5 px-4 text-xs font-mono font-bold text-red-300">{fmt(totDebit)}</td>
+                  <td className="py-2.5 px-4 text-xs font-mono font-bold text-green-300">{fmt(totCredit)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3 border-t border-[#F1F5F9]">
+          <span className="text-xs text-[#94A3B8]">
+            {filtered.length === 0 ? "No hay entradas" : `Mostrando ${paginated.length} de ${filtered.length} entradas`}
+          </span>
+          {filtered.length > perPage && (
+            <button onClick={() => setPerPage(p => p + 25)}
+              className="px-3 py-1 rounded-lg border border-[#E2E8F0] text-xs text-[#14B8A6] font-semibold hover:bg-[#F0FDFB]">
+              Cargar más
+            </button>
+          )}
+        </div>
       </motion.div>
     </div>
   );

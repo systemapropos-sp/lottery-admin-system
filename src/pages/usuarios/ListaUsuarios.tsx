@@ -15,12 +15,8 @@ interface BancaUser {
   zone: string; isActive: boolean; lastLogin: string;
 }
 
-const adminUsers: AdminUser[] = [
-  {id:"a1",username:"superadmin",  fullName:"Super Administrador", email:"super@nmvapp.com", role:"superadmin", isActive:true,  lastLogin:""},
-  {id:"a2",username:"admin",       fullName:"Administrador NMV",   email:"admin@nmvapp.com", role:"admin",      isActive:true,  lastLogin:""},
-  {id:"a3",username:"supervisor1", fullName:"Supervisor Zona 1",   email:"sup1@nmvapp.com",  role:"supervisor", isActive:true,  lastLogin:""},
-  {id:"a4",username:"supervisor2", fullName:"Supervisor SFM",      email:"sup2@nmvapp.com",  role:"supervisor", isActive:false, lastLogin:""},
-];
+// Usuarios admin: se cargan desde Supabase (tabla users)
+const adminUsers: AdminUser[] = [];
 
 const roleConfig = {
   superadmin: {label:"Super Admin", color:"text-purple-700", bg:"bg-purple-50 border-purple-200"},
@@ -82,7 +78,9 @@ export default function ListaUsuarios() {
             {adminUsers.length} administradores · {bancaUsers.length} operadores de banca
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-xl hover:bg-[#3DBDB5] shadow-sm transition-colors">
+        <button
+          onClick={() => { window.location.hash = "/users/new"; }}
+          className="flex items-center gap-2 px-4 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-xl hover:bg-[#3DBDB5] shadow-sm transition-colors">
           <Plus size={15}/> Crear Usuario
         </button>
       </div>

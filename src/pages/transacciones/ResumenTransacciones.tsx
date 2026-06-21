@@ -1,214 +1,192 @@
-import { useState, useMemo } from "react";
+// @ts-nocheck
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, DollarSign, BarChart3 } from "lucide-react";
+import { RefreshCw, Inbox } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import StatCard from "@/components/ui/StatCard";
-import { transactions, bettingPools } from "@/data/mockData";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { supabase, BUSINESS_ID } from "@/lib/supabase";
 
-interface DailySummary {
-  fecha: string;
-  debitos: number;
-  creditos: number;
-  neto: number;
-}
+const today = new Date().toISOString().split("T")[0];
+const weekAgo = new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0];
+const fmt = (n: number) => `$${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 export default function ResumenTransacciones() {
-  const [periodo, setPeriodo] = useState("7d");
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [desde, setDesde] = useState(weekAgo);
+  const [hasta, setHasta] = useState(today);
 
-  const stats = useMemo(() => {
-    const totalDebitos = transactions.filter((t) => t.type === "PAGO").reduce((s, t) => s + t.amount, 0);
-    const totalCreditos = transactions.filter((t) => t.type === "COBRO").reduce((s, t) => s + t.amount, 0);
-    return {
-      totalDebitos,
-      totalCreditos,
-      neto: totalCreditos - totalDebitos,
-      count: transactions.length,
-    };
-  }, []);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from("accountable_transactions")
+        .select("*")
+        .eq("business_id", BUSINESS_ID)
+        .gte("date", desde)
+        .lte("date", hasta)
+        .limit(2000);
+      setRows(data || []);
+    } catch { setRows([]); }
+    finally { setLoading(false); }
+  };
 
-  const dailyData: DailySummary[] = useMemo(() => {
-    const map = new Map<string, { debitos: number; creditos: number }>();
-    transactions.forEach((t) => {
-      const date = new Date(t.createdAt).toLocaleDateString("es-ES");
-      if (!map.has(date)) map.set(date, { debitos: 0, creditos: 0 });
-      const entry = map.get(date)!;
-      if (t.type === "PAGO") entry.debitos += t.amount;
-      else entry.creditos += t.amount;
-    });
-    return Array.from(map.entries())
-      .map(([fecha, vals]) => ({ fecha, ...vals, neto: vals.creditos - vals.debitos }))
-      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const porBancaData = useMemo(() => {
-    const map = new Map<string, { name: string; debitos: number; creditos: number }>();
-    transactions.forEach((t) => {
-      if (!map.has(t.bettingPoolName)) {
-        map.set(t.bettingPoolName, { name: t.bettingPoolName, debitos: 0, creditos: 0 });
+  const resumen = useMemo(() => {
+    const map = new Map<string, { pool: string; cobros: number; pagos: number; debitoVentas: number; creditoVentas: number; rojoAlDia: number; }>();
+    rows.forEach(t => {
+      const key = t.pool_id || t.pool_name || t.entity_name || "N/A";
+      if (!map.has(key)) map.set(key, { pool: t.pool_name || t.entity_name || key, cobros: 0, pagos: 0, debitoVentas: 0, creditoVentas: 0, rojoAlDia: 0 });
+      const r = map.get(key)!;
+      const type = (t.type || "").toUpperCase();
+      if (type === "COBRO" || type === "COBRO DE EMPLEADO") r.cobros += Math.abs(t.amount || 0);
+      else if (type === "PAGO" || type === "PAGO DE EMPLEADO") r.pagos += Math.abs(t.amount || 0);
+      else if (type === "RESULTADOS DE VENTA") {
+        if ((t.amount || 0) < 0) r.debitoVentas += Math.abs(t.amount || 0);
+        else r.creditoVentas += t.amount || 0;
       }
-      const entry = map.get(t.bettingPoolName)!;
-      if (t.type === "PAGO") entry.debitos += t.amount;
-      else entry.creditos += t.amount;
     });
-    return Array.from(map.values()).map((v) => ({
-      name: v.name,
-      value: v.creditos + v.debitos,
-    }));
-  }, []);
+    return [...map.values()];
+  }, [rows]);
 
-  const porCategoriaData = useMemo(() => {
-    const map = new Map<string, number>();
-    transactions.forEach((t) => {
-      map.set(t.category, (map.get(t.category) || 0) + t.amount);
-    });
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
-  }, []);
-
-  const COLORS = ["#4ECDC4", "#FF6B6B", "#45B7D1", "#FFD93D", "#96CEB4", "#DDA0DD", "#F9A826", "#FD79A8"];
-
-  const summaryByEntity = useMemo(() => {
-    return bettingPools.slice(0, 6).map((pool) => {
-      const poolTxns = transactions.filter((t) => t.bettingPoolId === pool.id);
-      const debitos = poolTxns.filter((t) => t.type === "PAGO").reduce((s, t) => s + t.amount, 0);
-      const creditos = poolTxns.filter((t) => t.type === "COBRO").reduce((s, t) => s + t.amount, 0);
-      return {
-        name: pool.name,
-        mwrCode: pool.mwrCode,
-        saldoInicial: pool.balance,
-        debitos,
-        creditos,
-        saldoFinal: pool.balance + creditos - debitos,
-      };
-    });
-  }, []);
+  const totals = useMemo(() => ({
+    cobros: resumen.reduce((s, r) => s + r.cobros, 0),
+    pagos: resumen.reduce((s, r) => s + r.pagos, 0),
+    neto: resumen.reduce((s, r) => s + (r.cobros - r.pagos), 0),
+    debito: resumen.reduce((s, r) => s + r.debitoVentas, 0),
+    credito: resumen.reduce((s, r) => s + r.creditoVentas, 0),
+    netoVentas: resumen.reduce((s, r) => s + (r.creditoVentas - r.debitoVentas), 0),
+    rojo: resumen.reduce((s, r) => s + r.rojoAlDia, 0),
+  }), [resumen]);
 
   return (
-    <div className="min-h-[100dvh] p-6">
-      <PageHeader title="Resumen de Transacciones" subtitle="Vista general de movimientos financieros" />
+    <div className="p-4 md:p-6 space-y-5">
+      <PageHeader
+        title="Resumen de Transacciones"
+        subtitle="Transacciones › Resumen"
+        actions={
+          <button onClick={load} disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#14B8A6] to-[#0EA5E9] hover:brightness-105 disabled:opacity-60">
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Actualizar
+          </button>
+        }
+      />
 
-      {/* Stat Cards */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
-      >
-        <StatCard label="Total Debitos" value={stats.totalDebitos} format="currency" prefix="$" color="#EF4444" icon={TrendingDown} delay={0} />
-        <StatCard label="Total Creditos" value={stats.totalCreditos} format="currency" prefix="$" color="#22C55E" icon={TrendingUp} delay={1} />
-        <StatCard label="Neto" value={stats.neto} format="currency" prefix="$" color="#4ECDC4" icon={DollarSign} delay={2} />
-        <StatCard label="Transacciones" value={stats.count} format="number" color="#333333" icon={BarChart3} delay={3} />
+      {/* Date filter */}
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-white border border-[#E8EDF2] rounded-2xl p-4 flex items-center gap-3 flex-wrap"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+        <input type="date" value={desde} onChange={e => setDesde(e.target.value)}
+          className="px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6]" />
+        <span className="text-[#94A3B8]">→</span>
+        <input type="date" value={hasta} onChange={e => setHasta(e.target.value)}
+          className="px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#14B8A6]" />
+        <button onClick={load} disabled={loading}
+          className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#14B8A6] to-[#0EA5E9] hover:brightness-105 disabled:opacity-60">
+          Actualizar
+        </button>
       </motion.div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Line Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-[#333333]">Volumen por dia</h3>
-            <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="px-3 py-1.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4]">
-              <option value="7d">Ultimos 7 dias</option>
-              <option value="30d">Ultimos 30 dias</option>
-              <option value="90d">Ultimos 90 dias</option>
-            </select>
-          </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={dailyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E8E3" />
-              <XAxis dataKey="fecha" tick={{ fontSize: 12, fill: "#666666" }} />
-              <YAxis tick={{ fontSize: 12, fill: "#666666" }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip
-                formatter={(value: number) => [`$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`, ""]}
-                contentStyle={{ borderRadius: 8, border: "1px solid #E5E5E0", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
-              />
-              <Line type="monotone" dataKey="creditos" name="Creditos" stroke="#22C55E" strokeWidth={2} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="debitos" name="Debitos" stroke="#EF4444" strokeWidth={2} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="neto" name="Neto" stroke="#4ECDC4" strokeWidth={2} dot={{ r: 4 }} />
-              <Legend />
-            </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Pie Chart - By Pool */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-        >
-          <h3 className="text-lg font-semibold text-[#333333] mb-4">Distribucion por Banca</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie data={porBancaData} cx="50%" cy="50%" outerRadius={90} dataKey="value" nameKey="name" label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
-                {porBancaData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+      {/* Main table */}
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+        className="bg-white border border-[#E8EDF2] rounded-2xl overflow-hidden"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#0F172A]">
+                <th rowSpan={2} className="py-3 px-4 text-left text-[10px] font-bold text-white align-middle">Banca/Entidad</th>
+                <th colSpan={3} className="py-2 px-4 text-center text-[10px] font-bold text-white border-b border-white/20">Flujo de caja</th>
+                <th colSpan={3} className="py-2 px-4 text-center text-[10px] font-bold text-white border-b border-white/20">Resultados de Ventas</th>
+                <th rowSpan={2} className="py-3 px-4 text-left text-[10px] font-bold text-white align-middle whitespace-nowrap">Rojo al día</th>
+              </tr>
+              <tr className="bg-[#1E293B]">
+                {["Cobros","Pagos","Neto","Débito","Crédito","Neto"].map(h => (
+                  <th key={h} className="py-2 px-4 text-[10px] font-bold text-white text-center">{h}</th>
                 ))}
-              </Pie>
-              <Tooltip formatter={(value: number) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} />
-            </PieChart>
-          </ResponsiveContainer>
-        </motion.div>
-      </div>
-
-      {/* Pie Chart by Category + Summary Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-          className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-        >
-          <h3 className="text-lg font-semibold text-[#333333] mb-4">Por Categoria</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie data={porCategoriaData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ percent }: { name: string; percent: number }) => `${(percent * 100).toFixed(0)}%`}>
-                {porCategoriaData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value: number) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} />
-            </PieChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-          className="lg:col-span-2 bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-        >
-          <h3 className="text-lg font-semibold text-[#333333] mb-4">Resumen por Entidad</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[#F8F8F5] text-[#666666] text-[13px] font-semibold uppercase tracking-[0.03em]">
-                  <th className="px-4 py-3 text-left">Banca</th>
-                  <th className="px-4 py-3 text-right">Saldo Inicial</th>
-                  <th className="px-4 py-3 text-right">Debitos</th>
-                  <th className="px-4 py-3 text-right">Creditos</th>
-                  <th className="px-4 py-3 text-right">Saldo Final</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={8} className="py-12 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-[#14B8A6] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-[#94A3B8]">Cargando...</span>
+                  </div>
+                </td></tr>
+              ) : resumen.length === 0 ? (
+                <tr><td colSpan={8} className="py-14 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Inbox className="w-8 h-8 text-[#CBD5E1]" />
+                    <p className="text-sm text-[#94A3B8]">No se encontraron datos</p>
+                  </div>
+                </td></tr>
+              ) : (
+                resumen.map((r, i) => {
+                  const neto = r.cobros - r.pagos;
+                  const netoVentas = r.creditoVentas - r.debitoVentas;
+                  return (
+                    <tr key={i} className={`border-b border-[#F8FAFC] hover:bg-[#F8FAFC] ${i % 2 === 0 ? "" : "bg-[#FAFAFA]"}`}>
+                      <td className="py-2.5 px-4 text-xs text-[#0F172A] font-medium">{r.pool}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-green-600 text-right">{fmt(r.cobros)}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-red-500 text-right">{fmt(r.pagos)}</td>
+                      <td className={`py-2.5 px-4 text-xs font-mono font-bold text-right ${neto < 0 ? "text-red-600 bg-red-50" : "text-[#10B981] bg-green-50"}`}>{fmt(neto)}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-[#64748B] text-right">{fmt(r.debitoVentas)}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-[#64748B] text-right">{fmt(r.creditoVentas)}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-[#10B981] text-right bg-green-50">{fmt(netoVentas)}</td>
+                      <td className="py-2.5 px-4 text-xs font-mono text-blue-500 text-right bg-blue-50">{fmt(r.rojoAlDia)}</td>
+                    </tr>
+                  );
+                })
+              )}
+              {!loading && resumen.length > 0 && (
+                <tr className="bg-[#1E293B]">
+                  <td className="py-2.5 px-4 text-xs font-bold text-white">TOTALES</td>
+                  <td className="py-2.5 px-4 text-xs font-mono font-bold text-green-300 text-right">{fmt(totals.cobros)}</td>
+                  <td className="py-2.5 px-4 text-xs font-mono font-bold text-red-300 text-right">{fmt(totals.pagos)}</td>
+                  <td className={`py-2.5 px-4 text-xs font-mono font-bold text-right ${totals.neto < 0 ? "text-red-300" : "text-green-300"}`}>{fmt(totals.neto)}</td>
+                  <td className="py-2.5 px-4 text-xs font-mono text-[#94A3B8] text-right">{fmt(totals.debito)}</td>
+                  <td className="py-2.5 px-4 text-xs font-mono text-[#94A3B8] text-right">{fmt(totals.credito)}</td>
+                  <td className="py-2.5 px-4 text-xs font-mono text-green-300 text-right">{fmt(totals.netoVentas)}</td>
+                  <td className="py-2.5 px-4 text-xs font-mono text-blue-300 text-right">{fmt(totals.rojo)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {summaryByEntity.map((e, idx) => (
-                  <tr key={e.mwrCode} className={`border-b border-[#E8E8E3] ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFAF8]"} hover:bg-[#F0F8F7] transition-colors`}>
-                    <td className="px-4 py-3 font-medium text-[#333333]">{e.name}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-[#333333]">${e.saldoInicial.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-[#EF4444]">${e.debitos.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-[#22C55E]">${e.creditos.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium text-[#333333]">${e.saldoFinal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      </div>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
+
+      {/* Bottom: Retiros + Ajustes */}
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+        className="bg-white border border-[#E8EDF2] rounded-2xl overflow-hidden"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-[#0F172A]">
+              <th className="py-3 px-4 text-center text-[10px] font-bold text-white">Retiros de efectivo</th>
+              <th colSpan={2} className="py-3 px-4 text-center text-[10px] font-bold text-white border-l border-white/10">Ajustes</th>
+            </tr>
+            <tr className="bg-[#1E293B]">
+              <th className="py-2 px-4 text-[10px] font-bold text-white"></th>
+              <th className="py-2 px-4 text-[10px] font-bold text-white border-l border-white/10">Débito</th>
+              <th className="py-2 px-4 text-[10px] font-bold text-white">Crédito</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {[
+                rows.filter(r => (r.type || "").toUpperCase() === "RETIRO").reduce((s, r) => s + Math.abs(r.amount || 0), 0),
+                rows.filter(r => (r.type || "").toUpperCase() === "AJUSTE" && (r.amount || 0) < 0).reduce((s, r) => s + Math.abs(r.amount || 0), 0),
+                rows.filter(r => (r.type || "").toUpperCase() === "AJUSTE" && (r.amount || 0) >= 0).reduce((s, r) => s + (r.amount || 0), 0),
+              ].map((v, i) => (
+                <td key={i} className={`py-3 px-4 text-sm font-mono font-semibold text-center text-[#64748B] ${i > 0 ? "border-l border-[#E2E8F0]" : ""}`}>
+                  {fmt(v)}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </motion.div>
     </div>
   );
 }

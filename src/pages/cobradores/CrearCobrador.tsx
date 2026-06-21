@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -13,12 +13,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useZonasStore } from "@/store/zonasStore";
+import { useCobradoresStore } from "@/store/cobradoresStore";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
-const zones = ["Zona Norte", "Zona Sur", "Zona Este", "Zona Oeste", "Centro"];
-
-// ─── Field Component ───────────────────────────────────────────────────────────
+// ─── Field Component ─────────────────────────────────────────────────────────
 
 function Field({
   label,
@@ -46,17 +46,18 @@ function Field({
 const inputCls =
   "w-full px-3 py-2.5 border border-[#E5E5E0] rounded-lg text-sm text-[#333333] focus:outline-none focus:border-[#14B8A6] focus:ring-2 focus:ring-[rgba(20,184,166,0.12)] transition-all bg-white placeholder:text-[#BBBBBB]";
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CrearCobrador() {
   const navigate = useNavigate();
+  const { zonas, fetchZonas } = useZonasStore();
+  const { createCobrador } = useCobradoresStore();
 
   const [form, setForm] = useState({
-    id: "",
     name: "",
     phone: "",
     email: "",
-    zone: "",
+    zona_id: "",
     pin: "",
     confirmPin: "",
     notes: "",
@@ -65,6 +66,13 @@ export default function CrearCobrador() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    fetchZonas();
+  }, [fetchZonas]);
+
+  const activeZones = zonas.filter((z) => z.is_active);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -72,15 +80,34 @@ export default function CrearCobrador() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (form.pin !== form.confirmPin) {
+      setErrorMsg("Los PINs no coinciden");
+      return;
+    }
+    setErrorMsg("");
     setSaving(true);
-    // Simulate save
-    setTimeout(() => {
-      setSaving(false);
+
+    const selectedZona = activeZones.find((z) => z.id === form.zona_id);
+    const notesExtra = form.email ? `Email: ${form.email}${form.notes ? " | " + form.notes : ""}` : form.notes;
+
+    const result = await createCobrador({
+      name: form.name,
+      pin: form.pin,
+      phone: form.phone,
+      notes: notesExtra,
+      zona_id: form.zona_id || null,
+      zona_nombre: selectedZona?.nombre ?? null,
+    });
+
+    setSaving(false);
+    if (result.ok) {
       setSaved(true);
       setTimeout(() => navigate("/cobradores/lista"), 1200);
-    }, 900);
+    } else {
+      setErrorMsg(result.error ?? "Error al guardar");
+    }
   }
 
   return (
@@ -111,17 +138,6 @@ export default function CrearCobrador() {
             <h3 className="text-[13px] font-semibold text-[#333333]">Información Personal</h3>
           </div>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="ID Cobrador" icon={CreditCard} required>
-              <input
-                name="id"
-                value={form.id}
-                onChange={handleChange}
-                placeholder="COB-006"
-                className={inputCls}
-                required
-              />
-            </Field>
-
             <Field label="Nombre completo" icon={User} required>
               <input
                 name="name"
@@ -164,18 +180,17 @@ export default function CrearCobrador() {
             <h3 className="text-[13px] font-semibold text-[#333333]">Zona y Acceso</h3>
           </div>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Zona asignada" icon={MapPin} required>
+            <Field label="Zona asignada" icon={MapPin}>
               <select
-                name="zone"
-                value={form.zone}
+                name="zona_id"
+                value={form.zona_id}
                 onChange={handleChange}
                 className={inputCls}
-                required
               >
-                <option value="">Seleccionar zona...</option>
-                {zones.map((z) => (
-                  <option key={z} value={z}>
-                    {z}
+                <option value="">Sin zona asignada</option>
+                {activeZones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.nombre}
                   </option>
                 ))}
               </select>
@@ -244,6 +259,14 @@ export default function CrearCobrador() {
           </div>
         </div>
 
+        {/* ── Error Message ── */}
+        {errorMsg && (
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 mb-5">
+            <AlertCircle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
+            <p className="text-[12px] text-red-700">{errorMsg}</p>
+          </div>
+        )}
+
         {/* ── Info Banner ── */}
         <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 mb-5">
           <AlertCircle size={15} className="text-amber-500 mt-0.5 flex-shrink-0" />
@@ -279,7 +302,7 @@ export default function CrearCobrador() {
                 Guardando...
               </>
             ) : saved ? (
-              <>✓ Guardado</>
+              <>✔ Guardado</>
             ) : (
               <>
                 <Save size={14} />

@@ -28,6 +28,7 @@ export const DEFAULT_AVAILABLE_ITEMS: QuickAccessItem[] = [
   { id: "monitoreo",      label: "Monitoreo F8",       icon: "Monitor",         route: "/monitoreo",                        color: "#0891B2" },
   { id: "zonas",          label: "Zonas",              icon: "Map",             route: "/accountable-entities/zonas",        color: "#84CC16" },
   { id: "transacciones",  label: "Transacciones",      icon: "ArrowLeftRight",  route: "/transacciones",                    color: "#F59E0B" },
+  { id: "movil",          label: "Portal Móvil",        icon: "Smartphone",      route: "/movil",                            color: "#06B6D4" },
 ];
 
 // ─── Default Active Items (shown in quick access panel) ───────────────────────
@@ -41,6 +42,7 @@ export const DEFAULT_ACTIVE_IDS = [
   "horarios",
   "bancas",
   "cobradores",
+  "movil",
 ];
 
 // ─── Store Interface ──────────────────────────────────────────────────────────

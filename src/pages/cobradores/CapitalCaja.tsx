@@ -1,15 +1,15 @@
 // Módulo Capital/Caja — Admin entrega y recibe capital
-// Futuro: conectar a cobrador.nmvapp.com via Supabase
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Banknote, ArrowDownCircle, ArrowUpCircle, 
-  Plus, RefreshCw, Wallet, TrendingUp, TrendingDown,
+import {
+  Banknote, ArrowDownCircle, ArrowUpCircle,
+  Plus, Wallet, TrendingUp, TrendingDown,
   Clock, CheckCircle2, X, User
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useCobradoresStore } from "@/store/cobradoresStore";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 type TxType = "entrega" | "recibo";
 
 interface Transaction {
@@ -21,12 +21,6 @@ interface Transaction {
   fecha: Date;
 }
 
-// ─── Mock cobradores for selector ─────────────────────────────────────────────
-const COBRADORES_LIST = [
-  "Carlos Ramírez", "Luis Pérez", "Ana Martínez",
-  "Roberto Díaz", "María García", "Juan López",
-];
-
 function fmtMoney(n: number) {
   return new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(n);
 }
@@ -37,20 +31,21 @@ function fmtDate(d: Date) {
   return d.toLocaleDateString("es-DO", { day: "numeric", month: "short" });
 }
 
-// ─── New Transaction Modal ────────────────────────────────────────────────────
+// ─── New Transaction Modal ─────────────────────────────────────────────────
 function NuevaTxModal({
-  defaultTipo, onSave, onClose,
+  defaultTipo, cobradorList, onSave, onClose,
 }: {
   defaultTipo: TxType;
+  cobradorList: string[];
   onSave: (tx: Omit<Transaction, "id" | "fecha">) => void;
   onClose: () => void;
 }) {
   const [tipo, setTipo] = useState<TxType>(defaultTipo);
   const [monto, setMonto] = useState("");
-  const [cobrador, setCobrador] = useState(COBRADORES_LIST[0]);
+  const [cobrador, setCobrador] = useState(cobradorList[0] ?? "");
   const [nota, setNota] = useState("");
 
-  const valid = parseFloat(monto) > 0;
+  const valid = parseFloat(monto) > 0 && cobrador.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
@@ -106,7 +101,8 @@ function NuevaTxModal({
               <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
               <select value={cobrador} onChange={e => setCobrador(e.target.value)}
                 className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100">
-                {COBRADORES_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+                {cobradorList.length === 0 && <option value="">Sin cobradores disponibles</option>}
+                {cobradorList.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
@@ -158,14 +154,17 @@ function NuevaTxModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function CapitalCaja() {
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    { id:"t1", tipo:"entrega", monto:15000, cobrador:"Carlos Ramírez", nota:"Capital inicial del día",     fecha: new Date(Date.now()-3*3600000) },
-    { id:"t2", tipo:"recibo",  monto:8500,  cobrador:"Luis Pérez",     nota:"Cobro ruta norte",            fecha: new Date(Date.now()-2*3600000) },
-    { id:"t3", tipo:"entrega", monto:5000,  cobrador:"Ana Martínez",   nota:"Adicional para zona sur",     fecha: new Date(Date.now()-1*3600000) },
-    { id:"t4", tipo:"recibo",  monto:12000, cobrador:"Carlos Ramírez", nota:"Cierre parcial",              fecha: new Date(Date.now()-30*60000)  },
-  ]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [modalTipo, setModalTipo] = useState<TxType>("entrega");
+
+  const { cobradores, fetchCobradores } = useCobradoresStore();
+
+  useEffect(() => {
+    if (cobradores.length === 0) fetchCobradores();
+  }, [fetchCobradores]);
+
+  const cobradorList = cobradores.map(c => c.name);
 
   const abrirModal = (t: TxType) => { setModalTipo(t); setShowModal(true); };
 
@@ -229,6 +228,7 @@ export default function CapitalCaja() {
           <div className="py-16 text-center">
             <Banknote size={36} className="mx-auto text-gray-200 mb-3"/>
             <p className="text-gray-400">Sin movimientos registrados</p>
+            <p className="text-gray-300 text-xs mt-1">Usa los botones de arriba para registrar capital</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -281,6 +281,7 @@ export default function CapitalCaja() {
         {showModal && (
           <NuevaTxModal
             defaultTipo={modalTipo}
+            cobradorList={cobradorList}
             onSave={addTx}
             onClose={() => setShowModal(false)}
           />

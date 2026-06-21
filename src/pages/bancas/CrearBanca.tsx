@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { useBancasZonas } from "@/context/BancasZonasContext";
+import { useBancasStore } from "@/store/bancasStore";
 import type { Banca } from "@/store/bancasStore";
 import type { Zona } from "@/store/zonasStore";
 
@@ -88,11 +90,12 @@ function Inp({ label, placeholder, type = "text" }: { label: string; placeholder
   );
 }
 
-function CreateBtn() {
+function CreateBtn({ onClick, saving }: { onClick?: () => void; saving?: boolean }) {
   return (
     <div className="flex justify-center my-6">
-      <button className="px-16 py-2.5 bg-[#4ECDC4] text-white rounded-full text-sm font-bold hover:bg-[#3DBDB5] transition-all shadow-[0_2px_8px_rgba(78,205,196,0.3)] uppercase tracking-widest">
-        CREAR
+      <button onClick={onClick} disabled={saving}
+        className="px-16 py-2.5 bg-[#4ECDC4] text-white rounded-full text-sm font-bold hover:bg-[#3DBDB5] transition-all shadow-[0_2px_8px_rgba(78,205,196,0.3)] uppercase tracking-widest disabled:opacity-60">
+        {saving ? "CREANDO..." : "CREAR"}
       </button>
     </div>
   );
@@ -131,46 +134,91 @@ function PlantillaSection() {
 
 // ─── Tab content components ────────────────────────────────────────────────────
 function TabGeneral() {
+  const navigate = useNavigate();
   const { bancas, zonas } = useBancasZonas();
+  const { createBanca } = useBancasStore();
   const nextCode = useMemo(() => getNextBancaCode(bancas), [bancas]);
-  const [numero, setNumero] = useState(nextCode);
 
-  // update numero when bancas load
+  const [form, setForm] = useState({
+    nombre: "", username: "", password: "", confirmacion: "",
+    ubicacion: "", referencia: "", comentario: "", zona_id: "",
+  });
+  const [numero, setNumero] = useState(nextCode);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
   useMemo(() => { setNumero(getNextBancaCode(bancas)); }, [bancas]);
+
+  function fld(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
+    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  }
+
+  async function handleCrear() {
+    if (!form.nombre.trim()) { setMsg({ type: "err", text: "El nombre es requerido" }); return; }
+    if (!numero.trim()) { setMsg({ type: "err", text: "El número es requerido" }); return; }
+    if (form.password && form.password !== form.confirmacion) {
+      setMsg({ type: "err", text: "Las contraseñas no coinciden" }); return;
+    }
+    const zona = zonas.find((z: Zona) => z.id === form.zona_id);
+    setSaving(true);
+    setMsg(null);
+    const { ok, error } = await createBanca({
+      name:      form.nombre.trim(),
+      code:      numero.trim(),
+      mwr_code:  numero.trim(),
+      balance:   0,
+      zone_id:   form.zona_id || null,
+      zone_name: zona?.nombre || null,
+      is_active: true,
+    });
+    setSaving(false);
+    if (ok) {
+      setMsg({ type: "ok", text: `✅ Banca "${form.nombre}" creada exitosamente en Supabase (${numero})` });
+      setTimeout(() => navigate("/bancas"), 1800);
+    } else {
+      setMsg({ type: "err", text: error ?? "Error al crear banca" });
+    }
+  }
 
   return (
     <div className="space-y-3">
+      {msg && (
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm border ${msg.type === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+          {msg.type === "ok" ? <CheckCircle2 size={16}/> : <AlertCircle size={16}/>} {msg.text}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {["Nombre *","Nombre de usuario *","Contrasena *","Confirmacion *","Ubicacion","Referencia"].map(f => (
-          <div key={f}>
-            <label className="block text-sm font-medium text-[#333] mb-1">{f}</label>
-            <input type={f.includes("Contrasena") || f.includes("Confirmacion") ? "password" : "text"} placeholder={f.replace(" *","")} className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4]" />
+        {[
+          { label: "Nombre *", name: "nombre", type: "text" },
+          { label: "Nombre de usuario *", name: "username", type: "text" },
+          { label: "Contraseña *", name: "password", type: "password" },
+          { label: "Confirmación *", name: "confirmacion", type: "password" },
+          { label: "Ubicación", name: "ubicacion", type: "text" },
+          { label: "Referencia", name: "referencia", type: "text" },
+        ].map(f => (
+          <div key={f.name}>
+            <label className="block text-sm font-medium text-[#333] mb-1">{f.label}</label>
+            <input type={f.type} name={f.name} value={(form as Record<string, string>)[f.name]}
+              onChange={fld} placeholder={f.label.replace(" *", "")}
+              className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4]" />
           </div>
         ))}
 
-        {/* ── Numero — auto-numeración ─────────────────────────────────────── */}
+        {/* Numero — auto-numeración */}
         <div>
           <label className="block text-sm font-medium text-[#333] mb-1">
             Numero *
             <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-600 border border-teal-100">
-              <Sparkles size={9} />
-              Auto-asignado
+              <Sparkles size={9} /> Auto-asignado
             </span>
           </label>
           <div className="relative">
-            <input
-              type="text"
-              value={numero}
-              onChange={(e) => setNumero(e.target.value)}
+            <input type="text" value={numero} onChange={(e) => setNumero(e.target.value)}
               className="w-full px-3 py-2 border-2 border-[#4ECDC4] rounded-lg text-sm focus:outline-none font-mono font-bold text-teal-700 bg-teal-50"
-              placeholder="RDV-001"
-            />
-            <button
-              type="button"
-              onClick={() => setNumero(nextCode)}
-              title="Restaurar auto-número"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-teal-500 hover:text-teal-700 font-semibold transition-colors"
-            >
+              placeholder="RDV-001" />
+            <button type="button" onClick={() => setNumero(nextCode)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-teal-500 hover:text-teal-700 font-semibold">
               ↺ auto
             </button>
           </div>
@@ -182,17 +230,22 @@ function TabGeneral() {
 
         <div>
           <label className="block text-sm font-medium text-[#333] mb-1">Zona</label>
-          <select className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] bg-white">
+          <select name="zona_id" value={form.zona_id} onChange={fld}
+            className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] bg-white">
             <option value="">Seleccionar zona...</option>
             {zonas.map((z: Zona) => <option key={z.id} value={z.id}>{z.nombre}</option>)}
           </select>
         </div>
       </div>
+
       <div>
         <label className="block text-sm font-medium text-[#333] mb-1">Comentario</label>
-        <textarea rows={3} className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] resize-none" placeholder="Notas adicionales..." />
+        <textarea name="comentario" value={form.comentario} onChange={fld}
+          rows={3} className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4] resize-none"
+          placeholder="Notas adicionales..." />
       </div>
-      <CreateBtn />
+
+      <CreateBtn onClick={handleCrear} saving={saving} />
       <PlantillaSection />
     </div>
   );

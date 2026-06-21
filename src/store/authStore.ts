@@ -1,7 +1,20 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AdminUser } from "@/data/mockData";
-import { adminUsers } from "@/data/mockData";
+import { supabase } from "@/lib/supabase";
+
+// ─── AdminUser type (migrado de mockData) ───────────────────────────────────
+export interface AdminUser {
+  id: string;
+  username: string;
+  password: string;
+  name: string;
+  fullName?: string;
+  role: string;
+  email?: string;
+  permissions?: string[];
+  zones?: string[];
+  bancaId?: string | null;
+}
 
 // ─── Banca Permissions ──────────────────────────────────────────────────────────
 
@@ -10,6 +23,8 @@ export const BANCA_PERMISSION_KEYS = [
   "ventas_historicas", "imprimir_reporte", "duplicar_jugadas", "jugadas",
   "pagar", "ver_ventas", "horarios", "ayuda", "configuracion",
   "autorizar_ponchado", "reportes", "generador_jugadas",
+  // Nuevas secciones detectadas en nmvapp.com
+  "resultados", "escanear", "movil",
 ] as const;
 
 export type BancaPermKey = typeof BANCA_PERMISSION_KEYS[number];
@@ -32,6 +47,9 @@ export const BANCA_PERM_LABELS: Record<BancaPermKey, string> = {
   autorizar_ponchado:    "Autorizar Ponchado",
   reportes:              "Reportes",
   generador_jugadas:     "Generador de Jugadas Aleatorias",
+  resultados:            "Resultados (Dropdown)",
+  escanear:              "Escanear Tickets",
+  movil:                 "Portal Movil",
 };
 
 export type BancaPerms = Record<BancaPermKey, boolean>;
@@ -128,7 +146,7 @@ interface AuthState {
   bancaPermissions: BancaPermissions;
   permissionsLog: PermLogEntry[];
   getBancaPerms: (bancaId: string) => BancaPerms;
-  setBancaPermission: (bancaId: string, bancaName: string, permKey: BancaPermKey, value: boolean) => void;
+  setBancaPermission: (bancaId: string, bancaName: string, permKey: BancaPermKey, value: boolean, bancaCode?: string) => void;
   resetBancaPerms: (bancaId: string) => void;
 
   // UI actions
@@ -210,6 +228,8 @@ export const translations = {
     "nav.transactions.summary": "Resumen",
     "nav.transactions.pools": "Bancas",
     "nav.transactions.categories": "Categorias de gastos",
+    "nav.transactions.entities": "Entidades",
+    "nav.transactions.recargas": "Recargas clientes",
     "nav.limits.list": "Lista",
     "nav.limits.create": "Crear",
     "nav.limits.automatic": "Limites automaticos",
@@ -361,6 +381,8 @@ export const translations = {
     "nav.transactions.summary": "Summary",
     "nav.transactions.pools": "Pools",
     "nav.transactions.categories": "Expense Categories",
+    "nav.transactions.entities": "Entities",
+    "nav.transactions.recargas": "Customer Recharges",
     "nav.limits.list": "List",
     "nav.limits.create": "Create",
     "nav.limits.automatic": "Automatic Limits",
@@ -500,14 +522,29 @@ export const useAuthStore = create<AuthState>()(
     return stored ?? defaultPerms();
   },
 
-  setBancaPermission: (bancaId, bancaName, permKey, value) =>
+  setBancaPermission: (bancaId, bancaName, permKey, value, bancaCode) =>
     set((state) => {
       const current = state.bancaPermissions[bancaId] ?? defaultPerms();
+      const updatedPerms = { ...current, [permKey]: value };
       const updated: BancaPermissions = {
         ...state.bancaPermissions,
-        [bancaId]: { ...current, [permKey]: value },
+        [bancaId]: updatedPerms,
       };
       savePerms(updated);
+
+      // ── Supabase real-time save (fire & forget) ──────────────────────────
+      if (bancaCode) {
+        const BIZ_ID = "bb000001-0000-0000-0000-000000000001";
+        supabase
+          .from("banca_permisos")
+          .upsert(
+            { banca_id: bancaCode, business_id: BIZ_ID, permisos: updatedPerms, updated_by: state.user?.username ?? "admin" },
+            { onConflict: "banca_id,business_id" }
+          )
+          .then(({ error }) => {
+            if (error) console.warn("[permisos] Supabase save error:", error.message);
+          });
+      }
 
       const entry: PermLogEntry = {
         id: `log-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -537,30 +574,43 @@ export const useAuthStore = create<AuthState>()(
   login: async (username: string, password: string) => {
     set({ isLoading: true, error: null });
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      // Query admin_users from Supabase — matches username + (pin OR password)
+      const { data, error } = await supabase
+        .from("admin_users")
+        .select("id, username, full_name, role, email, pin, password, is_active")
+        .eq("username", username.trim().toLowerCase())
+        .eq("is_active", true)
+        .single();
 
-    const found = adminUsers.find(
-      (u) =>
-        u.username.toLowerCase() === username.toLowerCase() &&
-        u.password === password
-    );
+      if (error || !data) {
+        set({ user: null, isAuthenticated: false, isLoading: false, error: "Credenciales invalidas" });
+        return false;
+      }
 
-    if (found) {
-      set({
-        user: found,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      });
+      // Accept pin OR password
+      const validPin = data.pin && data.pin === password.trim();
+      const validPass = data.password && data.password === password.trim();
+
+      if (!validPin && !validPass) {
+        set({ user: null, isAuthenticated: false, isLoading: false, error: "Credenciales invalidas" });
+        return false;
+      }
+
+      const user: AdminUser = {
+        id: data.id,
+        username: data.username,
+        password: "",
+        name: data.full_name ?? data.username,
+        fullName: data.full_name,
+        role: data.role ?? "admin",
+        email: data.email,
+      };
+
+      set({ user, isAuthenticated: true, isLoading: false, error: null });
       return true;
-    } else {
-      set({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: "Credenciales invalidas",
-      });
+    } catch {
+      set({ user: null, isAuthenticated: false, isLoading: false, error: "Error de conexion" });
       return false;
     }
   },

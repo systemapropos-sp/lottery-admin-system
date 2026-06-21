@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { adminUsers } from "@/data/mockData";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
+// Datos reales de admins se cargarán desde Supabase
+const adminUsers: { id:string; username:string; fullName:string; zoneName:string; lastLogin:string }[] = [];
 
 export default function Administradores() {
   return (

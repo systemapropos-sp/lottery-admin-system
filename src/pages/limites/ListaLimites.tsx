@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { RotateCw, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const NMV_SORTEOS = [
@@ -12,8 +13,7 @@ const NMV_SORTEOS = [
   "SUPER PALE NY-GANA MAS","LA PRIMERA 7PM","SUPER PALE NACIONAL-QP",
   "SUPER PALE NY-NACIONAL","LA SUERTE 6:00PM",
 ];
-const NMV_BANCAS = Array.from({length:13},(_,i)=>`NMV RD ${String(i+1).padStart(2,"0")}`);
-const NMV_ZONAS = ["Default","SFM"];
+// Bancas y zonas: se cargan desde BancasZonasContext (Supabase)
 const TIPOS_LIMITE = ["General para grupo","General por banca","Por sorteo","Por zona"];
 const DIAS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const JUGADAS_LISTA = [
@@ -45,6 +45,7 @@ const ZONE_TABS = ["General para grupo","General para zona"] as const;
 type ZoneTab = (typeof ZONE_TABS)[number];
 
 export default function ListaLimites() {
+  const { bancas, zonas } = useBancasZonas();
   const [tipoLimite, setTipoLimite] = useState("");
   const [sorteoFilter, setSorteoFilter] = useState("");
   const [diaFilter, setDiaFilter] = useState("");
@@ -102,14 +103,14 @@ export default function ListaLimites() {
             <label className="text-[10px] font-semibold text-[#999] uppercase tracking-wider">Bancas</label>
             <select value={bancaFilter} onChange={e=>setBancaFilter(e.target.value)} className={selectCls}>
               <option value="">Todas</option>
-              {NMV_BANCAS.map(b=><option key={b}>{b}</option>)}
+              {bancas.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-semibold text-[#999] uppercase tracking-wider">Zonas</label>
             <select value={zonaFilter} onChange={e=>setZonaFilter(e.target.value)} className={selectCls}>
               <option value="">Todas</option>
-              {NMV_ZONAS.map(z=><option key={z}>{z}</option>)}
+              {zonas.map(z=><option key={z.id} value={z.nombre}>{z.nombre}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1.5 flex-1 min-w-[130px]">

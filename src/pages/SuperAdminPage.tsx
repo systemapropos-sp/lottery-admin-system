@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Shield, RefreshCw, CheckCircle2, XCircle, Plus, Pause, ToggleRight, ToggleLeft, Users, Building2, Ticket, BarChart3, X, Store } from "lucide-react";
-import { supabase, BUSINESS_ID } from "@/lib/supabase";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -259,36 +259,22 @@ function CreateAdminModal({ onSave, onClose }: {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SuperAdminPage() {
-  const [tab, setTab] = useState<"resumen" | "control" | "admins" | "vendedores">("resumen");
+  const [tab, setTab] = useState<"resumen" | "control" | "admins" | "vendedores" | "cobradores" | "movil">("resumen");
   const [admins, setAdmins] = useState<AdminUser[]>(initialAdmins);
   const [controls, setControls] = useState<SystemControls>(initialControls);
   const [showCreateAdmin, setShowCreateAdmin] = useState(false);
-  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const { bancas } = useBancasZonas();
+  const vendedores: Vendedor[] = bancas.map(b => ({
+    id: b.id,
+    nombre: b.name || b.code || "Sin nombre",
+    usuario: b.code || b.id,
+    email: b.zone_name || "",
+    pin: b.mwr_code || "—",
+    bancaAsignada: b.code || "",
+    estado: b.is_active ? "activo" : "pausado",
+  }));
   const [showCreateVendedor, setShowCreateVendedor] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  // Load vendors from Supabase
-  useEffect(() => {
-    supabase
-      .from("vendors")
-      .select("*")
-      .eq("is_active", true)
-      .then(({ data }) => {
-        if (data) {
-          setVendedores(
-            data.map((v) => ({
-              id: v.id,
-              nombre: v.name || v.vendor_code || "Sin nombre",
-              usuario: v.vendor_code || v.id,
-              email: v.phone || "",
-              pin: v.pin || "",
-              bancaAsignada: v.vendor_code || "",
-              estado: v.is_active ? "activo" : "pausado",
-            }))
-          );
-        }
-      });
-  }, []);
 
   const superAdmins = admins.filter((a) => a.rol === "SuperAdmin").length;
   const adminCount = admins.filter((a) => a.rol === "Admin").length;
@@ -308,10 +294,12 @@ export default function SuperAdminPage() {
   };
 
   const tabs: { key: typeof tab; emoji: string; label: string }[] = [
-    { key: "resumen", emoji: "📊", label: "Resumen" },
-    { key: "control", emoji: "⚙️", label: "Control" },
-    { key: "admins", emoji: "👥", label: "Admins" },
-    { key: "vendedores", emoji: "🏪", label: "Bancas" },
+    { key: "resumen",     emoji: "📊", label: "Resumen" },
+    { key: "control",     emoji: "⚙️", label: "Control" },
+    { key: "admins",      emoji: "👥", label: "Admins" },
+    { key: "vendedores",  emoji: "🏪", label: "Bancas" },
+    { key: "cobradores",  emoji: "🚴", label: "Cobradores" },
+    { key: "movil",       emoji: "📱", label: "Móvil" },
   ];
 
   return (
@@ -422,11 +410,36 @@ export default function SuperAdminPage() {
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <span>🏪</span> Bancas Registradas
+                <span className="ml-auto text-xs font-normal text-gray-400">{vendedores.length} total</span>
               </h3>
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Building2 size={32} className="text-gray-200 mb-3" />
-                <p className="text-gray-400 text-sm">Sin bancas registradas</p>
-              </div>
+              {vendedores.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Building2 size={32} className="text-gray-200 mb-3" />
+                  <p className="text-gray-400 text-sm">Cargando bancas...</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {vendedores.slice(0, 8).map(v => (
+                    <div key={v.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+                          <Building2 size={13} className="text-teal-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{v.nombre}</p>
+                          <p className="text-xs text-gray-400 font-mono">{v.usuario}</p>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                        v.estado === "activo" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                      }`}>{v.estado === "activo" ? "Activo" : "Pausado"}</span>
+                    </div>
+                  ))}
+                  {vendedores.length > 8 && (
+                    <p className="text-xs text-gray-400 text-center pt-1">+{vendedores.length - 8} más...</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -688,10 +701,9 @@ export default function SuperAdminPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-center">
-                        <button onClick={()=>setVendedores(prev=>prev.map(x=>x.id===v.id?{...x,estado:x.estado==="activo"?"pausado":"activo"}:x))}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border mx-auto transition-colors ${
-                            v.estado==="activo"?"border-amber-200 text-amber-600 hover:bg-amber-50":"border-green-200 text-green-600 hover:bg-green-50"}`}>
-                          {v.estado==="activo"?<><Pause size={11}/> Pausar</>:<><CheckCircle2 size={11}/> Activar</>}
+                        <button onClick={() => { window.location.hash = "/bancas"; }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border mx-auto transition-colors border-blue-200 text-blue-600 hover:bg-blue-50">
+                          Ver banca →
                         </button>
                       </td>
                     </tr>
@@ -703,29 +715,86 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* Modal Vendedor */}
+      {/* ── TAB: COBRADORES ──────────────────────────────────────────────── */}
+      {tab === "cobradores" && (
+        <div className="space-y-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Módulo Cobradores</h2>
+              <p className="text-sm text-gray-400 mt-0.5">Gestión de rutas, cobros y capital de cobradores</p>
+            </div>
+            <button
+              onClick={() => { window.location.hash = "/cobradores"; }}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white rounded-xl"
+              style={{ background: "linear-gradient(135deg,#F97316,#FB923C)" }}
+            >
+              Ir a Cobradores →
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { emoji: "🚴", label: "Lista de Cobradores", desc: "Ver todos los cobradores registrados", route: "/cobradores/lista" },
+              { emoji: "🗺️", label: "Rutas", desc: "Gestionar rutas asignadas", route: "/cobradores/rutas" },
+              { emoji: "💰", label: "Cobros del Día", desc: "Cobros realizados hoy", route: "/cobradores/cobros-del-dia" },
+              { emoji: "📋", label: "Historial", desc: "Historial completo de cobros", route: "/cobradores/historial" },
+              { emoji: "⚖️", label: "Balance", desc: "Balance por cobrador", route: "/cobradores/balance" },
+              { emoji: "🏦", label: "Capital", desc: "Resumen de capital manejado", route: "/cobradores/capital" },
+            ].map(item => (
+              <button key={item.label}
+                onClick={() => { window.location.hash = item.route; }}
+                className="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-orange-300 hover:shadow-md transition-all group">
+                <div className="text-2xl mb-3">{item.emoji}</div>
+                <p className="font-semibold text-gray-800 text-sm group-hover:text-orange-600 transition-colors">{item.label}</p>
+                <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: MÓVIL ───────────────────────────────────────────────────── */}
+      {tab === "movil" && (
+        <div className="space-y-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Portal Móvil (numeros.nmvapp.com)</h2>
+              <p className="text-sm text-gray-400 mt-0.5">Gestión de clientes, recargas, retiros y tickets del portal móvil</p>
+            </div>
+            <button
+              onClick={() => { window.location.hash = "/movil"; }}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white rounded-xl"
+              style={{ background: "linear-gradient(135deg,#06B6D4,#0EA5E9)" }}
+            >
+              Ir a Móvil →
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { emoji: "👤", label: "Clientes", desc: "Lista de clientes registrados", route: "/movil" },
+              { emoji: "➕", label: "Crear Cliente", desc: "Registrar nuevo cliente móvil", route: "/movil" },
+              { emoji: "💵", label: "Recargas", desc: "Gestionar recargas de saldo", route: "/movil" },
+              { emoji: "🏧", label: "Retiros", desc: "Solicitudes de retiro", route: "/movil" },
+              { emoji: "🎟️", label: "Tickets Móvil", desc: "Tickets generados desde el portal", route: "/movil" },
+              { emoji: "🏆", label: "Premios Móvil", desc: "Premios pendientes de pago", route: "/movil" },
+            ].map(item => (
+              <button key={item.label}
+                onClick={() => { window.location.hash = item.route; }}
+                className="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-cyan-300 hover:shadow-md transition-all group">
+                <div className="text-2xl mb-3">{item.emoji}</div>
+                <p className="font-semibold text-gray-800 text-sm group-hover:text-cyan-600 transition-colors">{item.label}</p>
+                <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Vendedor — redirect to bancas module to create */}
       {showCreateVendedor && (
         <CreateVendedorModal
-          onSave={async (v) => {
-            // Save to Supabase vendors table
-            const { error } = await supabase.from("vendors").insert({
-              name: v.nombre,
-              vendor_code: v.usuario,
-              pin: v.pin,
-              phone: v.email || null,
-              is_active: true,
-              admin_id: "RDV-01",
-              business_id: BUSINESS_ID,
-              sorteos: [],
-              colores: {},
-              horarios: {},
-            });
-            if (!error) {
-              setVendedores(prev => [...prev, { ...v, usuario: v.usuario }]);
-              setShowCreateVendedor(false);
-            } else {
-              alert("Error al crear vendedor: " + error.message);
-            }
+          onSave={() => {
+            setShowCreateVendedor(false);
+            window.location.hash = "/bancas/crear";
           }}
           onClose={()=>setShowCreateVendedor(false)}
         />

@@ -25,6 +25,14 @@ import {
   Banknote,
   Shield,
   Bell,
+  LayoutDashboard,
+  CalendarDays,
+  Briefcase,
+  ShieldCheck,
+  Monitor,
+  Map,
+  ArrowLeftRight,
+  Smartphone,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -43,6 +51,14 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   Banknote,
   Shield,
   Bell,
+  LayoutDashboard,
+  CalendarDays,
+  Briefcase,
+  ShieldCheck,
+  Monitor,
+  Map,
+  ArrowLeftRight,
+  Smartphone,
 };
 
 function SettingsIcon({ iconName, size = 18 }: { iconName: string; size?: number }) {

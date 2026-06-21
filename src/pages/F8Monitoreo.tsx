@@ -9,29 +9,14 @@ import {
   Search, RotateCcw, TrendingUp, DollarSign, Clock,
 } from "lucide-react";
 
-// ─── Datos locales ────────────────────────────────────────────────────────────
+// ─── Datos desde Supabase via BancasZonasContext ──────────────────────────────
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
-const NMV_BANCAS_LIST = [
-  {id:"b01",code:"NMV-0001",name:"NMV RD 01"},
-  {id:"b02",code:"NMV-0002",name:"NMV RD 02"},
-  {id:"b03",code:"NMV-0003",name:"NMV RD 03"},
-  {id:"b04",code:"NMV-0004",name:"NMV RD 04"},
-  {id:"b05",code:"NMV-0005",name:"NMV RD 05"},
-  {id:"b06",code:"NMV-0006",name:"NMV RD 06"},
-  {id:"b07",code:"NMV-0007",name:"NMV RD 07"},
-  {id:"b08",code:"NMV-0008",name:"NMV RD 08"},
-  {id:"b09",code:"NMV-0009",name:"NMV RD 09"},
-  {id:"b10",code:"NMV-0010",name:"NMV RD 10"},
-  {id:"b11",code:"NMV-0011",name:"NMV RD 11"},
-  {id:"b12",code:"NMV-0012",name:"NMV RD 12"},
-  {id:"b13",code:"NMV-0013",name:"NMV RD 13"},
-];
 const NMV_LOTERIAS = [
   "Florida AM","Florida PM","New York AM","New York PM",
   "Anguila 10AM","Anguila PM","Nacional","Leidsa","King Lottery",
 ];
 const TIPOS_JUGADA = ["Directo","Pale","Tripleta","Super Pale","Quiniela"];
-const ZONAS = ["Default","SFM"];
 
 interface Ticket {
   id:string; numero:string; fecha:string; usuario:string; banca:string;
@@ -42,15 +27,8 @@ interface Ticket {
   zona:string;
 }
 
-const DEMO: Ticket[] = [
-  {id:"t1",numero:"NMV-001-000066387",fecha:"06/18/2026 09:32 AM",usuario:"mr01",banca:"NMV-0001",loteria:"Anguila 10AM",tipoJugada:"Directo",numeroJugado:"03",monto:1040,premio:1600,fechaCancelacion:null,canceladoPor:null,estado:"pagado",zona:"Default"},
-  {id:"t2",numero:"NMV-001-000066360",fecha:"06/18/2026 09:12 AM",usuario:"mr01",banca:"NMV-0001",loteria:"Anguila 10AM",tipoJugada:"Directo",numeroJugado:"03",monto:565,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"perdedor",zona:"Default"},
-  {id:"t3",numero:"NMV-001-000066359",fecha:"06/18/2026 09:11 AM",usuario:"mr01",banca:"NMV-0001",loteria:"Anguila 10AM",tipoJugada:"Directo",numeroJugado:"03",monto:490,premio:0,fechaCancelacion:"06/18/2026 09:12 AM",canceladoPor:"mr01",estado:"cancelado",zona:"Default"},
-  {id:"t4",numero:"NMV-002-000045231",fecha:"06/18/2026 10:00 AM",usuario:"user02",banca:"NMV-0002",loteria:"Florida AM",tipoJugada:"Pale",numeroJugado:"12-34",monto:750,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"perdedor",zona:"Default"},
-  {id:"t5",numero:"NMV-002-000045240",fecha:"06/18/2026 10:15 AM",usuario:"user02",banca:"NMV-0002",loteria:"Florida PM",tipoJugada:"Directo",numeroJugado:"07",monto:300,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"pendiente",zona:"Default"},
-  {id:"t6",numero:"NMV-008-000031100",fecha:"06/18/2026 08:45 AM",usuario:"sfmuser",banca:"NMV-0008",loteria:"New York AM",tipoJugada:"Tripleta",numeroJugado:"22-55-77",monto:200,premio:0,fechaCancelacion:null,canceladoPor:null,estado:"perdedor",zona:"SFM"},
-  {id:"t7",numero:"NMV-008-000031101",fecha:"06/18/2026 08:50 AM",usuario:"sfmuser",banca:"NMV-0008",loteria:"Nacional",tipoJugada:"Directo",numeroJugado:"31",monto:1500,premio:4500,fechaCancelacion:null,canceladoPor:null,estado:"ganador",zona:"SFM"},
-];
+// Sin tickets hardcodeados — se cargarán desde Supabase
+const DEMO: Ticket[] = [];
 
 // ─── Toggle Switch ─────────────────────────────────────────────────────────────
 function Toggle({checked,onChange,label}:{checked:boolean;onChange:(v:boolean)=>void;label:string}) {
@@ -69,8 +47,10 @@ function Toggle({checked,onChange,label}:{checked:boolean;onChange:(v:boolean)=>
   );
 }
 
+type BancaItem = {id:string; code:string; name:string};
+
 // ─── Bancas Multi-Select ──────────────────────────────────────────────────────
-function BancasSelect({selected,onChange}:{selected:string[];onChange:(v:string[])=>void}) {
+function BancasSelect({selected,onChange,bancasList}:{selected:string[];onChange:(v:string[])=>void;bancasList:BancaItem[]}) {
   const [open,setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -78,9 +58,9 @@ function BancasSelect({selected,onChange}:{selected:string[];onChange:(v:string[
     document.addEventListener("mousedown",h);
     return()=>document.removeEventListener("mousedown",h);
   },[]);
-  const all = selected.length===NMV_BANCAS_LIST.length;
+  const all = bancasList.length>0 && selected.length===bancasList.length;
   const label = selected.length===0?"Todas las bancas":all?"Todas":
-    selected.length<=2?selected.map(id=>NMV_BANCAS_LIST.find(b=>b.id===id)?.code??"").join(", "):`${selected.length} bancas`;
+    selected.length<=2?selected.map(id=>bancasList.find(b=>b.id===id)?.code??"").join(", "):`${selected.length} bancas`;
   const toggle=(id:string)=>onChange(selected.includes(id)?selected.filter(s=>s!==id):[...selected,id]);
   return(
     <div ref={ref} className="relative">
@@ -98,11 +78,11 @@ function BancasSelect({selected,onChange}:{selected:string[];onChange:(v:string[
             className="absolute top-full mt-1.5 left-0 z-20 bg-white border border-[#E5E5E0] rounded-xl shadow-xl p-2 min-w-[220px] max-h-64 overflow-y-auto">
             <label className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm border-b border-[#F0F0EB] mb-1">
               <input type="checkbox" checked={all}
-                onChange={()=>onChange(all?[]:NMV_BANCAS_LIST.map(b=>b.id))}
+                onChange={()=>onChange(all?[]:bancasList.map(b=>b.id))}
                 className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
               <span className="font-semibold text-[#333]">Todas las bancas</span>
             </label>
-            {NMV_BANCAS_LIST.map(b=>(
+            {bancasList.map(b=>(
               <label key={b.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm transition-colors">
                 <input type="checkbox" checked={selected.includes(b.id)} onChange={()=>toggle(b.id)}
                   className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
@@ -118,7 +98,7 @@ function BancasSelect({selected,onChange}:{selected:string[];onChange:(v:string[
 }
 
 // ─── Zonas Multi-Select ────────────────────────────────────────────────────────
-function ZonasSelect({selected,onChange}:{selected:string[];onChange:(v:string[])=>void}) {
+function ZonasSelect({selected,onChange,zonasList}:{selected:string[];onChange:(v:string[])=>void;zonasList:string[]}) {
   const [open,setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -126,7 +106,7 @@ function ZonasSelect({selected,onChange}:{selected:string[];onChange:(v:string[]
     document.addEventListener("mousedown",h);
     return()=>document.removeEventListener("mousedown",h);
   },[]);
-  const all = selected.length===ZONAS.length;
+  const all = zonasList.length>0 && selected.length===zonasList.length;
   const label = selected.length===0?"Todas las zonas":all?"Todas":`${selected.length} zona(s)`;
   const toggle=(z:string)=>onChange(selected.includes(z)?selected.filter(s=>s!==z):[...selected,z]);
   return(
@@ -143,7 +123,7 @@ function ZonasSelect({selected,onChange}:{selected:string[];onChange:(v:string[]
           <motion.div initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}}
             transition={{duration:0.15}}
             className="absolute top-full mt-1.5 left-0 z-20 bg-white border border-[#E5E5E0] rounded-xl shadow-xl p-2 min-w-[160px]">
-            {ZONAS.map(z=>(
+            {zonasList.map(z=>(
               <label key={z} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#F5F5F0] cursor-pointer text-sm transition-colors">
                 <input type="checkbox" checked={selected.includes(z)} onChange={()=>toggle(z)}
                   className="rounded border-[#E5E5E0] text-[#4ECDC4] focus:ring-[#4ECDC4]"/>
@@ -189,6 +169,9 @@ type SortField = "numero"|"fecha"|"usuario"|"monto"|"premio"|"estado";
 
 // ─── Main Component ─────────────────────────────────────────────────────────────
 export default function F8Monitoreo() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const bancasList: BancaItem[] = bancasRaw.map(b => ({ id: b.id, code: b.code, name: b.name }));
+  const zonasList: string[] = zonasRaw.map(z => z.nombre);
   const today = new Date().toISOString().slice(0,10);
   const [fecha,setFecha] = useState(today);
   const [bancas,setBancas] = useState<string[]>([]);
@@ -210,7 +193,7 @@ export default function F8Monitoreo() {
     if(applied){
       if(bancas.length) list=list.filter(t=>{
         return bancas.some(bid=>{
-          const b=NMV_BANCAS_LIST.find(x=>x.id===bid);
+          const b=bancasList.find(x=>x.id===bid);
           return b&&(t.banca===b.code||t.banca===b.name);
         });
       });
@@ -332,7 +315,7 @@ export default function F8Monitoreo() {
           {/* Banca */}
           <div>
             <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-1.5">Banca</label>
-            <BancasSelect selected={bancas} onChange={setBancas}/>
+            <BancasSelect selected={bancas} onChange={setBancas} bancasList={bancasList}/>
           </div>
           {/* Lotería */}
           <div>
@@ -365,7 +348,7 @@ export default function F8Monitoreo() {
           <Toggle checked={pendientes} onChange={setPendientes} label="Pendientes de pago"/>
           <Toggle checked={soloGanadores} onChange={setSoloGanadores} label="Sólo ganadores"/>
           <div>
-            <ZonasSelect selected={zonas} onChange={setZonas}/>
+            <ZonasSelect selected={zonas} onChange={setZonas} zonasList={zonasList}/>
           </div>
           <button onClick={()=>setApplied(true)}
             className="flex items-center gap-2 px-6 py-2.5 bg-[#4ECDC4] text-white text-sm font-bold rounded-xl hover:bg-[#3DBDB5] active:scale-[0.97] transition-all shadow-[0_2px_10px_rgba(78,205,196,0.35)] hover:shadow-[0_4px_16px_rgba(78,205,196,0.4)]">

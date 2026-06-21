@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp, Check } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { zones, bettingPools } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -120,6 +120,7 @@ const initialPrivileges: PrivilegeCategory[] = [
 ];
 
 export default function CrearUsuario() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
   const [formData, setFormData] = useState({
     usuario: "",
     contrasena: "",
@@ -216,7 +217,7 @@ export default function CrearUsuario() {
               className="w-full px-3 py-2 border border-[#E5E5E0] rounded-lg text-sm focus:outline-none focus:border-[#4ECDC4]"
             >
               <option value="">Sin banca</option>
-              {bettingPools.map((bp) => (
+              {bancasRaw.map((bp) => (
                 <option key={bp.id} value={bp.id}>{bp.name}</option>
               ))}
             </select>
@@ -227,7 +228,7 @@ export default function CrearUsuario() {
         <div className="mt-4">
           <label className="block text-sm font-medium text-[#333333] mb-2">Zonas</label>
           <div className="flex flex-wrap gap-2">
-            {zones.map((z) => (
+            {zonasRaw.map((z) => (
               <label
                 key={z.id}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
@@ -242,7 +243,7 @@ export default function CrearUsuario() {
                   onChange={() => toggleZone(z.id)}
                   className="rounded text-[#4ECDC4] focus:ring-[#4ECDC4]"
                 />
-                <span className="text-sm text-[#333333]">{z.name}</span>
+                <span className="text-sm text-[#333333]">{z.nombre}</span>
               </label>
             ))}
           </div>

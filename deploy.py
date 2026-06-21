@@ -34,6 +34,9 @@ def upload_file(local_path, remote_path):
     print(f"  ✅ {remote_path} ({size:,} bytes)")
 
 # ─── Upload all files from dist ───────────────────────────────────────────────
+# Ensure the base admin directory exists
+ensure_dir(REMOTE_BASE)
+
 print(f"\nSubiendo archivos desde {LOCAL_DIST} → {REMOTE_BASE}/")
 
 uploaded = 0

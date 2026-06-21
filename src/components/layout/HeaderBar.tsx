@@ -246,7 +246,7 @@ export default function HeaderBar() {
                 {user?.username?.slice(0, 2).toUpperCase() ?? "AD"}
               </div>
               <span className="text-sm font-medium text-[#333333] hidden md:inline">
-                {user?.username ?? "admin"}
+                {user?.name ?? user?.fullName ?? user?.username ?? "admin"}
               </span>
             </button>
 

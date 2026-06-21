@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useAuthStore, BANCA_PERMISSION_KEYS, BANCA_PERM_LABELS } from "@/store/authStore";
 import type { BancaPermKey } from "@/store/authStore";
-import { bettingPools } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 // ─── Permission categories (visual grouping) ─────────────────────────────────
 
@@ -26,6 +26,10 @@ const PERM_GROUPS: { label: string; keys: BancaPermKey[] }[] = [
   {
     label: "Herramientas & Sistema",
     keys: ["horarios", "ayuda", "configuracion", "autorizar_ponchado"],
+  },
+  {
+    label: "Portal Vendedor (nmvapp.com)",
+    keys: ["resultados", "escanear", "movil"],
   },
 ];
 
@@ -53,6 +57,7 @@ function PermToggle({ value, onChange }: { value: boolean; onChange: (v: boolean
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PermisosPage() {
+  const { bancas: bancasRaw } = useBancasZonas();
   const { bancaPermissions, setBancaPermission, resetBancaPerms, permissionsLog } =
     useAuthStore();
 
@@ -62,13 +67,13 @@ export default function PermisosPage() {
 
   // Filter bancas
   const filtered = useMemo(() =>
-    bettingPools.filter((b) =>
+    bancasRaw.filter((b) =>
       b.name.toLowerCase().includes(search.toLowerCase()) ||
-      b.mwrCode.toLowerCase().includes(search.toLowerCase())
+      b.mwr_code.toLowerCase().includes(search.toLowerCase())
     ),
-  [search]);
+  [bancasRaw, search]);
 
-  const selected = selectedId ? bettingPools.find((b) => b.id === selectedId) : null;
+  const selected = selectedId ? bancasRaw.find((b) => b.id === selectedId) : null;
 
   const perms = selectedId
     ? (bancaPermissions[selectedId] ??
@@ -141,7 +146,7 @@ export default function PermisosPage() {
                     <p className={`text-sm font-medium truncate ${active ? "text-[#0F766E]" : "text-[#333333]"}`}>
                       {banca.name}
                     </p>
-                    <p className="text-xs text-[#999999]">{banca.mwrCode}</p>
+                    <p className="text-xs text-[#999999]">{banca.mwr_code}</p>
                   </div>
                   <div className="flex flex-col items-end flex-shrink-0 gap-0.5">
                     <span className={`text-xs font-medium ${allOn ? "text-[#14B8A6]" : "text-[#F59E0B]"}`}>
@@ -178,7 +183,7 @@ export default function PermisosPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h2 className="text-base font-semibold text-[#333333]">{selected.name}</h2>
-                  <p className="text-xs text-[#999999]">{selected.mwrCode} · {selected.zoneName}</p>
+                  <p className="text-xs text-[#999999]">{selected.mwr_code} · {selected.zone_name}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right">
@@ -286,7 +291,7 @@ export default function PermisosPage() {
                                   <PermToggle
                                     value={isOn}
                                     onChange={(v) =>
-                                      setBancaPermission(selected.id, selected.name, key, v)
+                                      setBancaPermission(selected.id, selected.name, key, v, selected.mwr_code)
                                     }
                                   />
                                 </div>

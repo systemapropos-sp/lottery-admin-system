@@ -2,14 +2,10 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, ChevronDown } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const MOCK_ZONAS = [
-  { zona: "Default", bancas: 19, tickets: 417, venta: 168880, comision1: 0, comision2: 0, premios: 157200, neto: 11680, final: 11680 },
-  { zona: "SFM",     bancas:  3, tickets:  82, venta:  25540, comision1: 439.20, comision2: 0, premios: 11360, neto: 13740.80, final: 13740.80 },
-];
-const ZONAS_LIST = ["Default", "SFM"];
-
+// ─── Sin datos mock — se cargarán desde Supabase ─────────────────────────────
+const MOCK_ZONAS: { zona: string; bancas: number; tickets: number; venta: number; comision1: number; comision2: number; premios: number; neto: number; final: number }[] = [];
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
@@ -46,6 +42,7 @@ function MultiSelect({ label, options, value, onChange }: {
 }
 
 export default function VentasZonas() {
+  const { zonas } = useBancasZonas();
   const [fecha, setFecha] = useState(today());
   const [selZonas, setSelZonas] = useState<string[]>([]);
   const [rows, setRows] = useState(MOCK_ZONAS);
@@ -79,7 +76,7 @@ export default function VentasZonas() {
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
             className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]" />
         </div>
-        <MultiSelect label="Zona" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas} />
+        <MultiSelect label="Zona" options={zonas.map(z => z.nombre)} value={selZonas} onChange={setSelZonas} />
         <button onClick={handleSearch}
           className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] transition-colors shadow-sm">
           <RefreshCw size={14} /> VER VENTAS

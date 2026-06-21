@@ -56,6 +56,7 @@ import ListaPorGrupos from "@/pages/transacciones/ListaPorGrupos";
 import ResumenTransacciones from "@/pages/transacciones/ResumenTransacciones";
 import TransaccionesBancas from "@/pages/transacciones/TransaccionesBancas";
 import CategoriasGastos from "@/pages/transacciones/CategoriasGastos";
+import RecargasClientes from "@/pages/transacciones/RecargasClientes";
 
 // ─── Limites ────────────────────────────────────────────────────────────────────
 import ListaLimites from "@/pages/limites/ListaLimites";
@@ -302,6 +303,7 @@ export default function App() {
       <Route path="/accountable-transactions/summary" element={<Protected><ResumenTransacciones /></Protected>} />
       <Route path="/accountable-transactions/pools" element={<Protected><TransaccionesBancas /></Protected>} />
       <Route path="/accountable-transactions/categories" element={<Protected><CategoriasGastos /></Protected>} />
+      <Route path="/accountable-transactions/recargas"   element={<Protected><RecargasClientes /></Protected>} />
 
       {/* ── MÓVIL ──────────────────────────────────────────────── */}
       <Route path="/movil/crear-cliente"    element={<Protected><MovilPage /></Protected>} />

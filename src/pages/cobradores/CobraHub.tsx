@@ -16,7 +16,7 @@ import {
   Wallet,
 } from "lucide-react";
 
-// ─── Sub-sections ──────────────────────────────────────────────────────────────
+// ─── Sub-sections ───────────────────────────────────────────────────────────────
 
 const sections = [
   {
@@ -28,7 +28,7 @@ const sections = [
     color: "#14B8A6",
     bg: "rgba(20,184,166,0.12)",
     border: "rgba(20,184,166,0.25)",
-    stats: "5 activos",
+    stats: "Cobradores activos",
   },
   {
     id: "crear",
@@ -50,7 +50,7 @@ const sections = [
     color: "#8B5CF6",
     bg: "rgba(139,92,246,0.12)",
     border: "rgba(139,92,246,0.25)",
-    stats: "4 zonas",
+    stats: "Ver zonas",
   },
   {
     id: "cobros-dia",
@@ -98,7 +98,7 @@ const sections = [
   },
 ];
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// ─── Component ──────────────────────────────────────────────────────────────────
 
 export default function CobraHub() {
   const navigate = useNavigate();
@@ -351,8 +351,8 @@ export default function CobraHub() {
           {/* ── Footer ── */}
           <div className="flex-shrink-0 px-6 py-3 border-t border-[#E5E5E0] bg-[#F8FAFC] flex items-center justify-between">
             <p className="text-[11px] text-[#94A3B8] flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-              Módulo en desarrollo — integración con cobrador.nmvapp.com próximamente
+              <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+              Módulo de cobradores — datos reales desde Supabase
             </p>
             <button
               onClick={handleClose}

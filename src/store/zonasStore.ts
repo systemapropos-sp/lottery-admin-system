@@ -7,9 +7,9 @@ export interface Zona {
   business_id: string;
   nombre: string;
   descripcion: string;
+  color?: string;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
 }
 
 interface ZonasState {
@@ -31,7 +31,7 @@ export const useZonasStore = create<ZonasState>((set) => ({
     set({ loading: true, error: null });
     const { data, error } = await supabase
       .from("zonas")
-      .select("id,business_id,nombre,descripcion,is_active,created_at,updated_at")
+      .select("id,business_id,nombre,descripcion,color,is_active,created_at")
       .eq("business_id", BUSINESS_ID)
       .order("nombre", { ascending: true });
     if (error) {

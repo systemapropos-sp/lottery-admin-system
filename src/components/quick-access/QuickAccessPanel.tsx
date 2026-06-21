@@ -25,6 +25,14 @@ import {
   Banknote,
   Shield,
   Bell,
+  LayoutDashboard,
+  CalendarDays,
+  Briefcase,
+  ShieldCheck,
+  Monitor,
+  Map,
+  ArrowLeftRight,
+  Smartphone,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; color?: string }>> = {
@@ -43,6 +51,14 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   Banknote,
   Shield,
   Bell,
+  LayoutDashboard,
+  CalendarDays,
+  Briefcase,
+  ShieldCheck,
+  Monitor,
+  Map,
+  ArrowLeftRight,
+  Smartphone,
 };
 
 function QuickAccessIcon({ item, size = 24 }: { item: QuickAccessItem; size?: number }) {
@@ -116,7 +132,7 @@ export default function QuickAccessPanel() {
 
           {/* Panel */}
           <motion.div
-            className="relative w-full max-w-3xl mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-5xl mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden"
             variants={panelVariants}
           >
             {/* Header */}
@@ -145,7 +161,7 @@ export default function QuickAccessPanel() {
                   Configurelos desde la pagina de Configuracion.
                 </div>
               ) : (
-                <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                <div className="grid grid-cols-5 sm:grid-cols-8 gap-4">
                   {activeItems.map((item, index) => (
                     <motion.button
                       key={item.id}
@@ -160,14 +176,14 @@ export default function QuickAccessPanel() {
                       }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleNavigate(item.route)}
-                      className="flex flex-col items-center gap-2 px-2 py-4 bg-white border border-[#E5E5E0] rounded-xl transition-colors cursor-pointer min-h-[96px] justify-center overflow-visible"
+                      className="flex flex-col items-center gap-2.5 px-2 py-5 bg-white border border-[#E5E5E0] rounded-2xl transition-colors cursor-pointer min-h-[110px] justify-center overflow-visible"
                     >
                       {/* Icon container */}
-                      <div className="w-11 h-11 rounded-xl bg-[#E8F8F5] flex items-center justify-center flex-shrink-0">
-                        <QuickAccessIcon item={item} size={22} />
+                      <div className="w-14 h-14 rounded-2xl bg-[#E8F8F5] flex items-center justify-center flex-shrink-0">
+                        <QuickAccessIcon item={item} size={26} />
                       </div>
                       {/* Label — always fully visible */}
-                      <span className="text-[10px] font-semibold text-[#444] text-center leading-snug w-full px-1 break-words">
+                      <span className="text-[11px] font-semibold text-[#444] text-center leading-snug w-full px-1 break-words">
                         {item.label}
                       </span>
                     </motion.button>

@@ -22,7 +22,7 @@ def upload_dir(ftp, local_dir, remote_dir):
             upload_dir(ftp, local_path, remote_path)
         else:
             with open(local_path, 'rb') as f:
-                ftp.storbinary(f'STOR {remote_path}', f)
+                ftp.storbinary(f'STOR {remote_path}', f, blocksize=4096)
                 size = os.path.getsize(local_path)
                 print(f'  ✅ {remote_path} ({size:,} bytes)')
 

@@ -11,19 +11,24 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
 import { useAuthStore, useTranslation } from "@/store/authStore";
-import {
-  bettingPools,
-  salesActivity,
-  topPools,
-  transactions,
-  type Transaction,
-} from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
+
+// ─── Local types & placeholder data ─────────────────────────────────────────
+interface Transaction {
+  id: string; type: string; amount: number; bettingPoolId: string;
+  bettingPoolName: string; mwrCode: string; createdBy: string;
+  createdAt: string; category: string; notes: string;
+}
+const transactions: Transaction[] = [];
+const salesActivity: { dayEn: string; dayEs: string; day: string; date: string; count: number; totalAmount: number; }[] = [];
+const topPools: { name: string; mwrCode: string; salesAmount: number; }[] = [];
 
 // ─── Dashboard Content ──────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const { t } = useTranslation();
   const addNotification = useAuthStore((s) => s.addNotification);
+  const { bancas: bancasRaw } = useBancasZonas();
 
   const [activeTab, setActiveTab] = useState<"COBRO" | "PAGO">("COBRO");
   const [selectedBanca, setSelectedBanca] = useState("");
@@ -33,11 +38,11 @@ export default function Dashboard() {
   // MWR codes
   const mwrCodes = useMemo(
     () =>
-      bettingPools.map((bp) => ({
-        value: bp.mwrCode,
-        label: `${bp.mwrCode} - ${bp.name}`,
+      bancasRaw.map((bp) => ({
+        value: bp.mwr_code,
+        label: `${bp.mwr_code} - ${bp.name}`,
       })),
-    []
+    [bancasRaw]
   );
 
   // Sales activity
@@ -63,7 +68,7 @@ export default function Dashboard() {
     {
       label: "Total Bancas",
       labelEn: "Total Pools",
-      value: bettingPools.length,
+      value: bancasRaw.length,
       color: "#333333",
       icon: Building2,
       format: "number" as const,
@@ -101,7 +106,7 @@ export default function Dashboard() {
     setIsSubmitting(true);
     await new Promise((r) => setTimeout(r, 600));
 
-    const pool = bettingPools.find((bp) => bp.mwrCode === selectedBanca);
+    const pool = bancasRaw.find((bp) => bp.mwr_code === selectedBanca);
     if (pool) {
       const newTxn: Transaction = {
         id: `txn-${Date.now()}`,
@@ -109,7 +114,7 @@ export default function Dashboard() {
         amount: Number(amount),
         bettingPoolId: pool.id,
         bettingPoolName: pool.name,
-        mwrCode: pool.mwrCode,
+        mwrCode: pool.mwr_code ?? "",
         createdBy: "alex",
         createdAt: new Date().toISOString(),
         category: activeTab === "COBRO" ? "Recaudacion" : "Pago",

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -13,25 +13,9 @@ import {
   List,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useCobradoresStore } from "@/store/cobradoresStore";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
-
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
-
-const mockHistorial = [
-  { id: "TXN-001", date: "2026-06-17", cobrador: "Juan Pérez",    cobradorId: "COB-001", banca: "Banca Las Americas", zone: "Zona Norte", amount: 3500, status: "completado", method: "efectivo" },
-  { id: "TXN-002", date: "2026-06-17", cobrador: "María García",  cobradorId: "COB-002", banca: "Banca El Sol",        zone: "Zona Sur",   amount: 2800, status: "completado", method: "efectivo" },
-  { id: "TXN-003", date: "2026-06-17", cobrador: "Ana Martínez",  cobradorId: "COB-004", banca: "Banca Royal",        zone: "Zona Oeste", amount: 5200, status: "completado", method: "transferencia" },
-  { id: "TXN-004", date: "2026-06-17", cobrador: "Juan Pérez",    cobradorId: "COB-001", banca: "Lucky Stars",        zone: "Zona Norte", amount: 1800, status: "pendiente",  method: "efectivo" },
-  { id: "TXN-005", date: "2026-06-16", cobrador: "Luis Rodríguez",cobradorId: "COB-005", banca: "Banca Central",     zone: "Centro",     amount: 4100, status: "completado", method: "transferencia" },
-  { id: "TXN-006", date: "2026-06-16", cobrador: "Ana Martínez",  cobradorId: "COB-004", banca: "El Gran Premio",    zone: "Zona Oeste", amount: 3300, status: "fallido",    method: "efectivo" },
-  { id: "TXN-007", date: "2026-06-16", cobrador: "María García",  cobradorId: "COB-002", banca: "Grand Prix",        zone: "Zona Sur",   amount: 2100, status: "completado", method: "efectivo" },
-  { id: "TXN-008", date: "2026-06-15", cobrador: "Juan Pérez",    cobradorId: "COB-001", banca: "Super Chance",      zone: "Zona Norte", amount: 4800, status: "completado", method: "transferencia" },
-  { id: "TXN-009", date: "2026-06-15", cobrador: "Luis Rodríguez",cobradorId: "COB-005", banca: "Megajuego",         zone: "Centro",     amount: 2900, status: "completado", method: "efectivo" },
-  { id: "TXN-010", date: "2026-06-14", cobrador: "Ana Martínez",  cobradorId: "COB-004", banca: "Banca Dorada",      zone: "Zona Oeste", amount: 6100, status: "completado", method: "transferencia" },
-  { id: "TXN-011", date: "2026-06-14", cobrador: "María García",  cobradorId: "COB-002", banca: "Banca Millonaria",  zone: "Zona Sur",   amount: 3750, status: "completado", method: "efectivo" },
-  { id: "TXN-012", date: "2026-06-13", cobrador: "Juan Pérez",    cobradorId: "COB-001", banca: "Banca El Triunfo",  zone: "Zona Norte", amount: 2200, status: "completado", method: "efectivo" },
-];
 
 const statusConfig = {
   completado: { label: "Completado", icon: CheckCircle2, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
@@ -39,10 +23,14 @@ const statusConfig = {
   fallido:    { label: "Fallido",    icon: XCircle,      color: "text-red-600",     bg: "bg-red-50",     border: "border-red-200" },
 };
 
-const allDates   = [...new Set(mockHistorial.map((h) => h.date))].sort((a, b) => b.localeCompare(a));
-const allCobradores = [...new Set(mockHistorial.map((h) => h.cobrador))];
-
-// ─── Component ─────────────────────────────────────────────────────────────────
+function formatDate(iso: string) {
+  try { return iso.split("T")[0]; } catch { return "—"; }
+}
+function formatTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" });
+  } catch { return "—"; }
+}
 
 export default function HistorialCobros() {
   const navigate = useNavigate();
@@ -52,8 +40,36 @@ export default function HistorialCobros() {
   const [cobradorFilter, setCobradorFilter] = useState("todos");
   const [viewMode, setViewMode]     = useState<"table" | "grid">("table");
 
+  const { cobros, cobradores, loading, fetchCobros, fetchCobradores } = useCobradoresStore();
+
+  useEffect(() => {
+    fetchCobros();
+    if (cobradores.length === 0) fetchCobradores();
+  }, [fetchCobros, fetchCobradores]);
+
+  // Map DB cobros → UI shape (same as CobrosDelDia)
+  const historialUI = useMemo(() => {
+    return cobros.map((c) => {
+      const cobrador = cobradores.find((cb) => cb.id === c.cobrador_id);
+      return {
+        id: c.id.slice(0, 7).toUpperCase(),
+        date: formatDate(c.fecha || c.created_at),
+        cobrador: cobrador?.name ?? "Desconocido",
+        cobradorId: c.cobrador_id.slice(0, 6),
+        banca: c.banca_name,
+        zone: cobrador?.zona_nombre ?? "—",
+        amount: c.monto,
+        status: c.tipo === "cobro" ? "completado" : c.tipo === "prestamo" ? "pendiente" : "completado",
+        method: c.tipo,
+      };
+    });
+  }, [cobros, cobradores]);
+
+  const allDates = useMemo(() => [...new Set(historialUI.map((h) => h.date))].sort((a, b) => b.localeCompare(a)), [historialUI]);
+  const allCobradores = useMemo(() => [...new Set(historialUI.map((h) => h.cobrador))], [historialUI]);
+
   const filtered = useMemo(() =>
-    mockHistorial.filter((h) => {
+    historialUI.filter((h) => {
       const ms = h.cobrador.toLowerCase().includes(search.toLowerCase()) ||
                  h.banca.toLowerCase().includes(search.toLowerCase()) ||
                  h.id.toLowerCase().includes(search.toLowerCase());
@@ -62,7 +78,7 @@ export default function HistorialCobros() {
       const mc = cobradorFilter === "todos" || h.cobrador === cobradorFilter;
       return ms && md && mst && mc;
     }),
-  [search, dateFilter, statusFilter, cobradorFilter]);
+  [historialUI, search, dateFilter, statusFilter, cobradorFilter]);
 
   const totalFiltrado = filtered
     .filter((h) => h.status === "completado")
@@ -101,9 +117,9 @@ export default function HistorialCobros() {
       {/* Summary bar */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Registros", value: mockHistorial.length, color: "#0EA5E9" },
-          { label: "Completados", value: mockHistorial.filter(h => h.status === "completado").length, color: "#10B981" },
-          { label: "Monto Total", value: `$${mockHistorial.filter(h => h.status === "completado").reduce((s, h) => s + h.amount, 0).toLocaleString()}`, color: "#14B8A6" },
+          { label: "Total Registros", value: historialUI.length, color: "#0EA5E9" },
+          { label: "Completados", value: historialUI.filter(h => h.status === "completado").length, color: "#10B981" },
+          { label: "Monto Total", value: `$${historialUI.filter(h => h.status === "completado").reduce((s, h) => s + h.amount, 0).toLocaleString()}`, color: "#14B8A6" },
         ].map((card, idx) => (
           <motion.div
             key={card.label}
@@ -167,7 +183,9 @@ export default function HistorialCobros() {
           </div>
         </div>
 
-        {viewMode === "table" ? (
+        {loading ? (
+          <div className="px-4 py-12 text-center text-[#999999] text-sm">Cargando historial...</div>
+        ) : viewMode === "table" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -186,7 +204,7 @@ export default function HistorialCobros() {
                     const Icon = sc.icon;
                     return (
                       <motion.tr
-                        key={h.id}
+                        key={h.id + idx}
                         initial={{ opacity: 0, y: 3 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.2, delay: idx * 0.03, ease: easeOut }}
@@ -220,7 +238,7 @@ export default function HistorialCobros() {
               const sc = statusConfig[h.status as keyof typeof statusConfig];
               const Icon = sc.icon;
               return (
-                <motion.div key={h.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04, ease: easeOut }}
+                <motion.div key={h.id + idx} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04, ease: easeOut }}
                   className="border border-[#E5E5E0] rounded-xl p-4 hover:shadow-sm transition-all"
                 >
                   <div className="flex justify-between mb-2">

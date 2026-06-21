@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Loader2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { bettingPools } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -15,18 +15,28 @@ interface PendingPool {
   status: "pending" | "cleaning" | "cleaned";
 }
 
-const initialPools: PendingPool[] = bettingPools.slice(0, 10).map((bp) => ({
-  id: bp.id,
-  name: bp.name,
-  mwrCode: bp.mwrCode,
-  users: bp.code,
-  pendingAmount: bp.balance > 0 ? bp.balance * 0.1 : 0,
-  status: "pending",
-}));
-
 export default function LimpiarPendientes() {
+  const { bancas: bancasRaw } = useBancasZonas();
   const [activeTab, setActiveTab] = useState<"lista" | "reporte">("lista");
-  const [pools, setPools] = useState<PendingPool[]>(initialPools);
+  const [pools, setPools] = useState<PendingPool[]>([]);
+
+  const initialPools = useMemo<PendingPool[]>(
+    () =>
+      bancasRaw.slice(0, 10).map((bp) => ({
+        id: bp.id,
+        name: bp.name,
+        mwrCode: bp.mwr_code,
+        users: bp.code,
+        pendingAmount: bp.balance > 0 ? bp.balance * 0.1 : 0,
+        status: "pending" as const,
+      })),
+    [bancasRaw]
+  );
+
+  useEffect(() => {
+    setPools(initialPools);
+  }, [bancasRaw]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [reportDate, setReportDate] = useState({ start: "2024-05-01", end: "2024-05-15" });
 
   const handleClean = (id: string) => {
@@ -139,7 +149,7 @@ export default function LimpiarPendientes() {
                     </tbody>
                   </table>
                 </div>
-                {pools.every((p) => p.status === "cleaned") && (
+                {pools.length > 0 && pools.every((p) => p.status === "cleaned") && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}

@@ -2,9 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { ChevronLeft, Plus, Check } from "lucide-react";
-import { zones as zonesData } from "@/data/mockData";
-
-const availableZones = zonesData.map((z) => z.name);
+import { useBancasZonas } from "@/context/BancasZonasContext";
+import { useReceptoresStore } from "@/store/receptoresStore";
 
 const availableEmailTypes = [
   "Reportes diarios",
@@ -17,6 +16,8 @@ const availableEmailTypes = [
 
 export default function CrearReceptor() {
   const navigate = useNavigate();
+  const { zonas: zonasRaw } = useBancasZonas();
+  const availableZones = zonasRaw.map((z) => z.nombre);
   const [email, setEmail] = useState("");
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -33,8 +34,15 @@ export default function CrearReceptor() {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { createReceptor } = useReceptoresStore();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    await createReceptor({
+      email: email.trim(),
+      zones: selectedZones,
+      email_types: selectedTypes,
+    });
     navigate("/mail-receptors");
   };
 
@@ -89,24 +97,28 @@ export default function CrearReceptor() {
               Zonas <span className="text-[#EF4444]">*</span>
             </label>
             <div className="flex flex-wrap gap-2">
-              {availableZones.map((zone) => {
-                const isSelected = selectedZones.includes(zone);
-                return (
-                  <button
-                    key={zone}
-                    type="button"
-                    onClick={() => toggleZone(zone)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
-                      isSelected
-                        ? "border-[#4ECDC4] bg-[#E0F7F5] text-[#0F766E]"
-                        : "border-[#E5E5E0] bg-white text-[#666666] hover:border-[#CCCCCC]"
-                    }`}
-                  >
-                    {isSelected && <Check size={14} />}
-                    {zone}
-                  </button>
-                );
-              })}
+              {availableZones.length === 0 ? (
+                <p className="text-xs text-[#999999]">Cargando zonas...</p>
+              ) : (
+                availableZones.map((zone) => {
+                  const isSelected = selectedZones.includes(zone);
+                  return (
+                    <button
+                      key={zone}
+                      type="button"
+                      onClick={() => toggleZone(zone)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
+                        isSelected
+                          ? "border-[#4ECDC4] bg-[#E0F7F5] text-[#0F766E]"
+                          : "border-[#E5E5E0] bg-white text-[#666666] hover:border-[#CCCCCC]"
+                      }`}
+                    >
+                      {isSelected && <Check size={14} />}
+                      {zone}
+                    </button>
+                  );
+                })
+              )}
             </div>
             {selectedZones.length === 0 && (
               <p className="text-xs text-[#999999] mt-1.5">

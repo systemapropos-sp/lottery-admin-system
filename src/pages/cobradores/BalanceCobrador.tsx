@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -14,101 +14,19 @@ import {
   List,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useZonasStore } from "@/store/zonasStore";
+import { useBancasStore } from "@/store/bancasStore";
+import { useCobradoresStore } from "@/store/cobradoresStore";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
-
-const mockZoneBalance = [
-  {
-    id: "Z-001",
-    zone: "Zona Norte",
-    cobrador: "Juan Pérez",
-    cobradorId: "COB-001",
-    color: "#14B8A6",
-    bg: "rgba(20,184,166,0.1)",
-    border: "rgba(20,184,166,0.2)",
-    totalCobrado: 12500,
-    totalPendiente: 1800,
-    totalBancas: 4,
-    bancas: [
-      { id: "B-001", name: "Banca Las Americas", cobrado: 3500, pendiente: 0,    estado: "al_dia" },
-      { id: "B-002", name: "Lucky Stars",        cobrado: 1800, pendiente: 1800, estado: "pendiente" },
-      { id: "B-003", name: "Banca El Triunfo",   cobrado: 3800, pendiente: 0,    estado: "al_dia" },
-      { id: "B-004", name: "Super Chance",       cobrado: 3400, pendiente: 0,    estado: "al_dia" },
-    ],
-  },
-  {
-    id: "Z-002",
-    zone: "Zona Sur",
-    cobrador: "María García",
-    cobradorId: "COB-002",
-    color: "#0EA5E9",
-    bg: "rgba(14,165,233,0.1)",
-    border: "rgba(14,165,233,0.2)",
-    totalCobrado: 8750,
-    totalPendiente: 0,
-    totalBancas: 3,
-    bancas: [
-      { id: "B-005", name: "Banca El Sol",      cobrado: 2800, pendiente: 0, estado: "al_dia" },
-      { id: "B-006", name: "Grand Prix",         cobrado: 2100, pendiente: 0, estado: "al_dia" },
-      { id: "B-007", name: "Banca Millonaria",   cobrado: 3850, pendiente: 0, estado: "al_dia" },
-    ],
-  },
-  {
-    id: "Z-003",
-    zone: "Zona Este",
-    cobrador: "Carlos López",
-    cobradorId: "COB-003",
-    color: "#8B5CF6",
-    bg: "rgba(139,92,246,0.1)",
-    border: "rgba(139,92,246,0.2)",
-    totalCobrado: 0,
-    totalPendiente: 9200,
-    totalBancas: 3,
-    bancas: [
-      { id: "B-008", name: "Banca Oriental",  cobrado: 0, pendiente: 3100, estado: "pendiente" },
-      { id: "B-009", name: "Lucky Dream",      cobrado: 0, pendiente: 2800, estado: "pendiente" },
-      { id: "B-010", name: "Banca Fortuna",    cobrado: 0, pendiente: 3300, estado: "pendiente" },
-    ],
-  },
-  {
-    id: "Z-004",
-    zone: "Zona Oeste",
-    cobrador: "Ana Martínez",
-    cobradorId: "COB-004",
-    color: "#F59E0B",
-    bg: "rgba(245,158,11,0.1)",
-    border: "rgba(245,158,11,0.2)",
-    totalCobrado: 15200,
-    totalPendiente: 0,
-    totalBancas: 5,
-    bancas: [
-      { id: "B-011", name: "Banca Occidental",  cobrado: 2700, pendiente: 0, estado: "al_dia" },
-      { id: "B-012", name: "El Gran Premio",     cobrado: 3200, pendiente: 0, estado: "al_dia" },
-      { id: "B-013", name: "Banca Dorada",       cobrado: 4100, pendiente: 0, estado: "al_dia" },
-      { id: "B-014", name: "Fortuna Max",        cobrado: 2900, pendiente: 0, estado: "al_dia" },
-      { id: "B-015", name: "Banca Royal",        cobrado: 2300, pendiente: 0, estado: "al_dia" },
-    ],
-  },
-  {
-    id: "Z-005",
-    zone: "Centro",
-    cobrador: "Luis Rodríguez",
-    cobradorId: "COB-005",
-    color: "#EC4899",
-    bg: "rgba(236,72,153,0.1)",
-    border: "rgba(236,72,153,0.2)",
-    totalCobrado: 6800,
-    totalPendiente: 2400,
-    totalBancas: 4,
-    bancas: [
-      { id: "B-016", name: "Banca Central",  cobrado: 2800, pendiente: 0,    estado: "al_dia" },
-      { id: "B-017", name: "Megajuego",       cobrado: 2900, pendiente: 0,    estado: "al_dia" },
-      { id: "B-018", name: "Banca Cristal",   cobrado: 1100, pendiente: 2400, estado: "pendiente" },
-      { id: "B-019", name: "Gran Casino",     cobrado: 0,    pendiente: 0,    estado: "al_dia" },
-    ],
-  },
+const ZONE_COLORS = [
+  { color: "#14B8A6", bg: "rgba(20,184,166,0.1)", border: "rgba(20,184,166,0.2)" },
+  { color: "#0EA5E9", bg: "rgba(14,165,233,0.1)", border: "rgba(14,165,233,0.2)" },
+  { color: "#8B5CF6", bg: "rgba(139,92,246,0.1)", border: "rgba(139,92,246,0.2)" },
+  { color: "#F59E0B", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.2)" },
+  { color: "#EC4899", bg: "rgba(236,72,153,0.1)", border: "rgba(236,72,153,0.2)" },
+  { color: "#10B981", bg: "rgba(16,185,129,0.1)", border: "rgba(16,185,129,0.2)" },
 ];
 
 const estadoConfig = {
@@ -116,15 +34,58 @@ const estadoConfig = {
   pendiente: { label: "Pendiente", color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200" },
 };
 
-// ─── Component ─────────────────────────────────────────────────────────────────
-
 export default function BalanceCobrador() {
   const navigate = useNavigate();
-  const [expandedZone, setExpandedZone] = useState<string | null>("Z-001");
+  const [expandedZone, setExpandedZone] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"detail" | "grid">("detail");
 
-  const totalCobrado  = mockZoneBalance.reduce((s, z) => s + z.totalCobrado,  0);
-  const totalPendiente = mockZoneBalance.reduce((s, z) => s + z.totalPendiente, 0);
+  const { zonas, fetchZonas } = useZonasStore();
+  const { bancas, fetchBancas } = useBancasStore();
+  const { cobradores, fetchCobradores } = useCobradoresStore();
+
+  useEffect(() => {
+    fetchZonas();
+    fetchBancas();
+    if (cobradores.length === 0) fetchCobradores();
+  }, [fetchZonas, fetchBancas, fetchCobradores]);
+
+  useEffect(() => {
+    if (zonas.length > 0 && !expandedZone) {
+      setExpandedZone(zonas[0].id);
+    }
+  }, [zonas]);
+
+  const zoneBalance = useMemo(() =>
+    zonas.filter((z) => z.is_active).map((zona, idx) => {
+      const palette = ZONE_COLORS[idx % ZONE_COLORS.length];
+      const zonaCobradores = cobradores.filter((c) => c.zona_id === zona.id);
+      const cobrador = zonaCobradores[0];
+      const zonaBancas = bancas.filter((b) => b.zone_id === zona.id && b.is_active);
+      const totalCobrado = zonaCobradores.reduce((s, c) => s + (c.balance ?? 0), 0);
+      return {
+        id: zona.id,
+        zone: zona.nombre,
+        cobrador: cobrador?.name ?? "Sin cobrador",
+        cobradorId: cobrador?.id ?? "",
+        color: palette.color,
+        bg: palette.bg,
+        border: palette.border,
+        totalCobrado,
+        totalPendiente: 0,
+        totalBancas: zonaBancas.length,
+        bancas: zonaBancas.map((b) => ({
+          id: b.id,
+          name: b.name,
+          cobrado: b.balance ?? 0,
+          pendiente: 0,
+          estado: "al_dia",
+        })),
+      };
+    }),
+  [zonas, bancas, cobradores]);
+
+  const totalCobrado  = zoneBalance.reduce((s, z) => s + z.totalCobrado, 0);
+  const totalPendiente = zoneBalance.reduce((s, z) => s + z.totalPendiente, 0);
   const totalGeneral  = totalCobrado + totalPendiente;
 
   return (
@@ -154,7 +115,7 @@ export default function BalanceCobrador() {
           { label: "Total General",  value: `$${totalGeneral.toLocaleString()}`,   color: "#0EA5E9",  Icon: DollarSign },
           { label: "Total Cobrado",  value: `$${totalCobrado.toLocaleString()}`,    color: "#10B981",  Icon: TrendingUp },
           { label: "Pendiente",      value: `$${totalPendiente.toLocaleString()}`, color: "#F59E0B",  Icon: TrendingDown },
-          { label: "Zonas",          value: mockZoneBalance.length,                color: "#8B5CF6",  Icon: MapPin },
+          { label: "Zonas",          value: zoneBalance.length,                    color: "#8B5CF6",  Icon: MapPin },
         ].map((card, idx) => {
           const Icon = card.Icon;
           return (
@@ -195,14 +156,16 @@ export default function BalanceCobrador() {
           </div>
         </div>
 
-        {viewMode === "detail" ? (
+        {zoneBalance.length === 0 ? (
+          <div className="px-4 py-12 text-center text-[#999999] text-sm">Cargando balance...</div>
+        ) : viewMode === "detail" ? (
           /* ── Accordion Detail ── */
           <div className="divide-y divide-[#F0F0EC]">
-            {mockZoneBalance.map((zone, idx) => {
+            {zoneBalance.map((zone, idx) => {
               const isOpen = expandedZone === zone.id;
               const pct = zone.totalCobrado + zone.totalPendiente > 0
                 ? Math.round((zone.totalCobrado / (zone.totalCobrado + zone.totalPendiente)) * 100)
-                : 0;
+                : 100;
               return (
                 <motion.div
                   key={zone.id}
@@ -264,50 +227,53 @@ export default function BalanceCobrador() {
                         <p className="text-[11px] font-semibold text-[#999999] uppercase tracking-wide mb-2">
                           Bancas — {zone.zone}
                         </p>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="text-[11px] text-[#999999] font-semibold uppercase">
-                                <th className="text-left pb-2 pr-4">Banca</th>
-                                <th className="text-right pb-2 pr-4">Cobrado</th>
-                                <th className="text-right pb-2 pr-4">Pendiente</th>
-                                <th className="text-center pb-2">Estado</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#F0F0EC]">
-                              {zone.bancas.map((banca, bIdx) => {
-                                const ec = estadoConfig[banca.estado as keyof typeof estadoConfig];
-                                return (
-                                  <motion.tr
-                                    key={banca.id}
-                                    initial={{ opacity: 0, x: -6 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: bIdx * 0.04 }}
-                                  >
-                                    <td className="py-2 pr-4">
-                                      <div className="flex items-center gap-2">
-                                        <Building2 size={12} style={{ color: zone.color }} />
-                                        <span className="text-[#333333] font-medium">{banca.name}</span>
-                                        <span className="font-mono text-[10px] text-[#BBBBBB]">{banca.id}</span>
-                                      </div>
-                                    </td>
-                                    <td className="py-2 pr-4 text-right font-semibold" style={{ color: zone.color }}>
-                                      ${banca.cobrado.toLocaleString()}
-                                    </td>
-                                    <td className="py-2 pr-4 text-right font-semibold text-amber-600">
-                                      {banca.pendiente > 0 ? `$${banca.pendiente.toLocaleString()}` : "—"}
-                                    </td>
-                                    <td className="py-2 text-center">
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${ec.color} ${ec.bg} ${ec.border}`}>
-                                        {ec.label}
-                                      </span>
-                                    </td>
-                                  </motion.tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                        {zone.bancas.length === 0 ? (
+                          <p className="text-[12px] text-[#BBBBBB] py-2">Sin bancas en esta zona</p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="text-[11px] text-[#999999] font-semibold uppercase">
+                                  <th className="text-left pb-2 pr-4">Banca</th>
+                                  <th className="text-right pb-2 pr-4">Balance</th>
+                                  <th className="text-right pb-2 pr-4">Pendiente</th>
+                                  <th className="text-center pb-2">Estado</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#F0F0EC]">
+                                {zone.bancas.map((banca, bIdx) => {
+                                  const ec = estadoConfig[banca.estado as keyof typeof estadoConfig];
+                                  return (
+                                    <motion.tr
+                                      key={banca.id}
+                                      initial={{ opacity: 0, x: -6 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: bIdx * 0.04 }}
+                                    >
+                                      <td className="py-2 pr-4">
+                                        <div className="flex items-center gap-2">
+                                          <Building2 size={12} style={{ color: zone.color }} />
+                                          <span className="text-[#333333] font-medium">{banca.name}</span>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 pr-4 text-right font-semibold" style={{ color: zone.color }}>
+                                        ${banca.cobrado.toLocaleString()}
+                                      </td>
+                                      <td className="py-2 pr-4 text-right font-semibold text-amber-600">
+                                        {banca.pendiente > 0 ? `$${banca.pendiente.toLocaleString()}` : "—"}
+                                      </td>
+                                      <td className="py-2 text-center">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${ec.color} ${ec.bg} ${ec.border}`}>
+                                          {ec.label}
+                                        </span>
+                                      </td>
+                                    </motion.tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   )}
@@ -318,10 +284,10 @@ export default function BalanceCobrador() {
         ) : (
           /* ── Grid View ── */
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mockZoneBalance.map((zone, idx) => {
+            {zoneBalance.map((zone, idx) => {
               const pct = zone.totalCobrado + zone.totalPendiente > 0
                 ? Math.round((zone.totalCobrado / (zone.totalCobrado + zone.totalPendiente)) * 100)
-                : 0;
+                : 100;
               return (
                 <motion.div
                   key={zone.id}
@@ -374,7 +340,7 @@ export default function BalanceCobrador() {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-[#E5E5E0] bg-[#FAFAF8] flex items-center justify-between">
-          <span className="text-[12px] text-[#999999]">{mockZoneBalance.length} zonas · {mockZoneBalance.reduce((s, z) => s + z.totalBancas, 0)} bancas</span>
+          <span className="text-[12px] text-[#999999]">{zoneBalance.length} zonas · {zoneBalance.reduce((s, z) => s + z.totalBancas, 0)} bancas</span>
           <div className="flex items-center gap-4">
             <span className="text-[12px] font-semibold text-emerald-600">Cobrado: ${totalCobrado.toLocaleString()}</span>
             <span className="text-[12px] font-semibold text-amber-600">Pendiente: ${totalPendiente.toLocaleString()}</span>

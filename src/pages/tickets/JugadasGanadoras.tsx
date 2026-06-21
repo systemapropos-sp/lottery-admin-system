@@ -2,27 +2,14 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, ChevronDown, FileText } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 function fmt(n:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(n);}
 function today(){return new Date().toISOString().split("T")[0];}
 
 const SORTEOS_LIST=["GANA MAS","LA PRIMERA","NEW YORK AM","FLORIDA AM","QUINIELA REAL","ANGUILA 10AM","LOTEKA","LA SUERTE","LOTEDOM"];
-const ZONAS_LIST=["Default","SFM"];
 
-// Mock grouped data: { sorteo, tipos: [{tipo, jugadas:[{num,venta,premio}]}] }
-const MOCK_RESULTS=[{
-  sorteo:"GANA MAS",
-  tipos:[
-    {tipo:"Directo",jugadas:[
-      {num:"15",venta:1175,premio:4700},{num:"21",venta:875,premio:7550},
-      {num:"18",venta:525,premio:2100},{num:"54",venta:400,premio:32000},
-      {num:"44",venta:275,premio:22000},{num:"50",venta:175,premio:1400},
-      {num:"61",venta:155,premio:1200},{num:"62",venta:50,premio:200},
-      {num:"97",venta:25,premio:2000},
-    ]},
-    {tipo:"Pale",jugadas:[{num:"18-61",venta:10,premio:1000}]},
-  ],
-}];
+const MOCK_RESULTS: { sorteo: string; tipos: { tipo: string; jugadas: { num: string; venta: number; premio: number }[] }[] }[] = [];
 
 function MultiSelect({label,options,value,onChange}:{label:string;options:string[];value:string[];onChange:(v:string[])=>void}){
   const [open,setOpen]=useState(false);
@@ -45,6 +32,7 @@ function MultiSelect({label,options,value,onChange}:{label:string;options:string
 }
 
 export default function JugadasGanadoras(){
+  const { zonas } = useBancasZonas();
   const [fi,setFi]=useState(()=>{const d=new Date();d.setDate(d.getDate()-3);return d.toISOString().split("T")[0];});
   const [ff,setFf]=useState(today());
   const [sorteo,setSorteo]=useState("GANA MAS");
@@ -71,7 +59,7 @@ export default function JugadasGanadoras(){
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none"/>
           </div>
         </div>
-        <MultiSelect label="Zonas" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas}/>
+        <MultiSelect label="Zonas" options={zonas.map(z => z.nombre)} value={selZonas} onChange={setSelZonas}/>
         <button className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] shadow-sm">
           <RefreshCw size={13}/> FILTRAR
         </button>

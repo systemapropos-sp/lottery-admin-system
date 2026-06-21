@@ -10,24 +10,17 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import PageHeader from "@/components/ui/PageHeader";
-import { zones as allZones, bettingPools, type Zone } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
+import type { Banca } from "@/store/bancasStore";
+import type { Zona } from "@/store/zonasStore";
 
 // ─── Zone Card Data ───────────────────────────────────────────────────────────
 
 interface ZoneCardData {
-  zone: Zone;
-  pools: typeof bettingPools;
+  zone: Zona;
+  pools: Banca[];
   totalBalance: number;
   activePools: number;
-}
-
-function buildZoneCards(): ZoneCardData[] {
-  return allZones.map((zone) => {
-    const pools = bettingPools.filter((bp) => bp.zoneId === zone.id);
-    const totalBalance = pools.reduce((sum, p) => sum + p.balance, 0);
-    const activePools = pools.filter((p) => p.isActive).length;
-    return { zone, pools, totalBalance, activePools };
-  });
 }
 
 // ─── Format currency ──────────────────────────────────────────────────────────
@@ -43,7 +36,16 @@ function formatCurrency(value: number): string {
 
 export default function ManejarZonas() {
   const navigate = useNavigate();
-  const [zoneCards] = useState<ZoneCardData[]>(buildZoneCards);
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+
+  const zoneCards = useMemo<ZoneCardData[]>(() => {
+    return zonasRaw.map((zone) => {
+      const pools = bancasRaw.filter((bp) => bp.zone_id === zone.id);
+      const totalBalance = pools.reduce((sum, p) => sum + (p.balance ?? 0), 0);
+      const activePools = pools.filter((p) => p.is_active).length;
+      return { zone, pools, totalBalance, activePools };
+    });
+  }, [zonasRaw, bancasRaw]);
 
   const grandTotal = useMemo(
     () => zoneCards.reduce((sum, z) => sum + z.totalBalance, 0),
@@ -84,7 +86,7 @@ export default function ManejarZonas() {
           </div>
           <div className="flex items-center gap-2 text-[#666666]">
             <Users size={16} className="text-[#4ECDC4]" />
-            <span>{bettingPools.length} bancas</span>
+            <span>{bancasRaw.length} bancas</span>
           </div>
           <div className="flex items-center gap-2">
             <DollarSign size={16} className="text-[#4ECDC4]" />
@@ -127,17 +129,16 @@ export default function ManejarZonas() {
             {/* Header */}
             <div className="flex items-center gap-3 mb-4">
               <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                style={{ backgroundColor: card.zone.color }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm bg-teal-500"
               >
-                {card.zone.name.substring(0, 2).toUpperCase()}
+                {card.zone.nombre.substring(0, 2).toUpperCase()}
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-[#333333]">
-                  {card.zone.name}
+                  {card.zone.nombre}
                 </h3>
                 <p className="text-xs text-[#999999]">
-                  {card.zone.description}
+                  {(card.zone as any).descripcion ?? ""}
                 </p>
               </div>
             </div>
@@ -261,7 +262,7 @@ export default function ManejarZonas() {
               </tr>
             </thead>
             <tbody>
-              {bettingPools.map((pool, idx) => (
+              {bancasRaw.map((pool, idx) => (
                 <motion.tr
                   key={pool.id}
                   initial={{ opacity: 0 }}
@@ -275,39 +276,36 @@ export default function ManejarZonas() {
                     {pool.name}
                   </td>
                   <td className="px-4 py-2.5 text-[#666666] font-mono text-xs">
-                    {pool.mwrCode}
+                    {pool.mwr_code}
                   </td>
                   <td className="px-4 py-2.5">
                     <span
                       className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
                       style={{
-                        backgroundColor:
-                          pool.zoneId === "z-01"
-                            ? "rgba(78,205,196,0.12)"
-                            : "rgba(245,158,11,0.12)",
-                        color:
-                          pool.zoneId === "z-01" ? "#4ECDC4" : "#F59E0B",
+                        backgroundColor: pool.zone_id
+                          ? "rgba(78,205,196,0.12)"
+                          : "rgba(245,158,11,0.12)",
+                        color: pool.zone_id ? "#4ECDC4" : "#F59E0B",
                       }}
                     >
                       <span
                         className="w-1.5 h-1.5 rounded-full"
                         style={{
-                          backgroundColor:
-                            pool.zoneId === "z-01" ? "#4ECDC4" : "#F59E0B",
+                          backgroundColor: pool.zone_id ? "#4ECDC4" : "#F59E0B",
                         }}
                       />
-                      {pool.zoneName}
+                      {pool.zone_name ?? "Sin zona"}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <span
                       className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        pool.isActive
+                        pool.is_active
                           ? "bg-green-100 text-green-800"
                           : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      {pool.isActive ? "Activa" : "Inactiva"}
+                      {pool.is_active ? "Activa" : "Inactiva"}
                     </span>
                   </td>
                 </motion.tr>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -13,99 +13,9 @@ import {
   List,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useCobradoresStore } from "@/store/cobradoresStore";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
-
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
-
-const today = "2026-06-17";
-
-const mockCobros = [
-  {
-    id: "TXN-001",
-    cobrador: "Juan Pérez",
-    cobradorId: "COB-001",
-    banca: "Banca Las Americas",
-    bancaId: "B-001",
-    zone: "Zona Norte",
-    amount: 3500,
-    time: "08:15",
-    status: "completado",
-    method: "efectivo",
-  },
-  {
-    id: "TXN-002",
-    cobrador: "María García",
-    cobradorId: "COB-002",
-    banca: "Banca El Sol",
-    bancaId: "B-005",
-    zone: "Zona Sur",
-    amount: 2800,
-    time: "09:02",
-    status: "completado",
-    method: "efectivo",
-  },
-  {
-    id: "TXN-003",
-    cobrador: "Ana Martínez",
-    cobradorId: "COB-004",
-    banca: "Banca Royal",
-    bancaId: "B-015",
-    zone: "Zona Oeste",
-    amount: 5200,
-    time: "09:45",
-    status: "completado",
-    method: "transferencia",
-  },
-  {
-    id: "TXN-004",
-    cobrador: "Juan Pérez",
-    cobradorId: "COB-001",
-    banca: "Lucky Stars",
-    bancaId: "B-002",
-    zone: "Zona Norte",
-    amount: 1800,
-    time: "10:30",
-    status: "pendiente",
-    method: "efectivo",
-  },
-  {
-    id: "TXN-005",
-    cobrador: "Luis Rodríguez",
-    cobradorId: "COB-005",
-    banca: "Banca Central",
-    bancaId: "B-016",
-    zone: "Centro",
-    amount: 4100,
-    time: "11:00",
-    status: "completado",
-    method: "transferencia",
-  },
-  {
-    id: "TXN-006",
-    cobrador: "Ana Martínez",
-    cobradorId: "COB-004",
-    banca: "El Gran Premio",
-    bancaId: "B-012",
-    zone: "Zona Oeste",
-    amount: 3300,
-    time: "11:25",
-    status: "fallido",
-    method: "efectivo",
-  },
-  {
-    id: "TXN-007",
-    cobrador: "María García",
-    cobradorId: "COB-002",
-    banca: "Grand Prix",
-    bancaId: "B-006",
-    zone: "Zona Sur",
-    amount: 2100,
-    time: "11:50",
-    status: "completado",
-    method: "efectivo",
-  },
-];
 
 const statusConfig = {
   completado: {
@@ -131,7 +41,13 @@ const statusConfig = {
   },
 };
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+function formatTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
+}
 
 export default function CobrosDelDia() {
   const navigate = useNavigate();
@@ -139,7 +55,35 @@ export default function CobrosDelDia() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
-  const filtered = mockCobros.filter((c) => {
+  const { cobros, cobradores, loading, fetchCobros, fetchCobradores } = useCobradoresStore();
+
+  const today = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    fetchCobros(undefined, today);
+    if (cobradores.length === 0) fetchCobradores();
+  }, [fetchCobros, fetchCobradores, today]);
+
+  // Map DB cobros → UI shape
+  const cobrosUI = useMemo(() => {
+    return cobros.map((c) => {
+      const cobrador = cobradores.find((cb) => cb.id === c.cobrador_id);
+      return {
+        id: c.id.slice(0, 7).toUpperCase(),
+        cobrador: cobrador?.name ?? "Desconocido",
+        cobradorId: c.cobrador_id.slice(0, 6),
+        banca: c.banca_name,
+        bancaId: c.banca_id?.slice(0, 6) ?? "—",
+        zone: cobrador?.zona_nombre ?? "—",
+        amount: c.monto,
+        time: formatTime(c.created_at),
+        status: c.tipo === "cobro" ? "completado" : c.tipo === "prestamo" ? "pendiente" : "completado",
+        method: c.tipo,
+      };
+    });
+  }, [cobros, cobradores]);
+
+  const filtered = cobrosUI.filter((c) => {
     const matchSearch =
       c.cobrador.toLowerCase().includes(search.toLowerCase()) ||
       c.banca.toLowerCase().includes(search.toLowerCase()) ||
@@ -148,11 +92,11 @@ export default function CobrosDelDia() {
     return matchSearch && matchStatus;
   });
 
-  const totalCobrado = mockCobros
+  const totalCobrado = cobrosUI
     .filter((c) => c.status === "completado")
     .reduce((sum, c) => sum + c.amount, 0);
-  const completados = mockCobros.filter((c) => c.status === "completado").length;
-  const pendientes = mockCobros.filter((c) => c.status === "pendiente").length;
+  const completados = cobrosUI.filter((c) => c.status === "completado").length;
+  const pendientes = cobrosUI.filter((c) => c.status === "pendiente").length;
 
   return (
     <motion.div
@@ -181,7 +125,7 @@ export default function CobrosDelDia() {
           { label: "Total Cobrado", value: `$${totalCobrado.toLocaleString()}`, color: "#14B8A6", icon: DollarSign },
           { label: "Completados", value: completados, color: "#10B981", icon: CheckCircle2 },
           { label: "Pendientes", value: pendientes, color: "#F59E0B", icon: Clock },
-          { label: "Total Transacciones", value: mockCobros.length, color: "#0EA5E9", icon: TrendingUp },
+          { label: "Total Transacciones", value: cobrosUI.length, color: "#0EA5E9", icon: TrendingUp },
         ].map((card, idx) => {
           const Icon = card.icon;
           return (
@@ -242,7 +186,9 @@ export default function CobrosDelDia() {
           </div>
         </div>
 
-        {viewMode === "table" ? (
+        {loading ? (
+          <div className="px-4 py-12 text-center text-[#999999] text-sm">Cargando cobros...</div>
+        ) : viewMode === "table" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

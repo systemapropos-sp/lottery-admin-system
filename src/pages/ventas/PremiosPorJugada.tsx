@@ -2,19 +2,13 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, ChevronDown, FileDown, Search, X } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 function fmt(n:number){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(n);}
 function today(){return new Date().toISOString().split("T")[0];}
-const ZONAS_LIST=["Default","SFM"];
 
-const DIRPALE=[
-  {banca:"MATADOR-SPORT",codigo:"MWR-0001",dJug:128005,dPrem:71200,dComis:0,    dNeto:56805,    pJug:37740,pPrem:86000,pComis:0,    pNeto:-48260  },
-  {banca:"MMW RD 02",    codigo:"MWR-0002",dJug:2135,  dPrem:8050, dComis:341.60,dNeto:-6256.60, pJug:610,  pPrem:0,    pComis:97.60, pNeto:512.40 },
-];
-const TRIPLES=[
-  {banca:"MATADOR-SPORT",codigo:"MWR-0001",tJug:0,tPrem:0,tComis:0,tNeto:0,spJug:0,spPrem:0,spComis:0,spNeto:0},
-  {banca:"MMW RD 02",    codigo:"MWR-0002",tJug:0,tPrem:0,tComis:0,tNeto:0,spJug:0,spPrem:0,spComis:0,spNeto:0},
-];
+const DIRPALE: {banca:string;codigo:string;dJug:number;dPrem:number;dComis:number;dNeto:number;pJug:number;pPrem:number;pComis:number;pNeto:number}[] = [];
+const TRIPLES: {banca:string;codigo:string;tJug:number;tPrem:number;tComis:number;tNeto:number;spJug:number;spPrem:number;spComis:number;spNeto:number}[] = [];
 
 function MultiSelect({label,options,value,onChange}:{label:string;options:string[];value:string[];onChange:(v:string[])=>void}){
   const [open,setOpen]=useState(false);
@@ -37,13 +31,14 @@ function MultiSelect({label,options,value,onChange}:{label:string;options:string
 }
 
 function Filters({fi,setFi,ff,setFf,selZonas,setSelZonas}:{fi:string;setFi:(v:string)=>void;ff:string;setFf:(v:string)=>void;selZonas:string[];setSelZonas:(v:string[])=>void}){
+  const { zonas } = useBancasZonas();
   return(
     <div className="bg-white rounded-xl border border-[#E5E5E0] p-4 flex flex-wrap items-end gap-3">
       <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha inicial</label>
         <input type="date" value={fi} onChange={e=>setFi(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
       <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha final</label>
         <input type="date" value={ff} onChange={e=>setFf(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
-      <MultiSelect label="Zonas" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas}/>
+      <MultiSelect label="Zonas" options={zonas.map(z => z.nombre)} value={selZonas} onChange={setSelZonas}/>
       <button className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] shadow-sm">
         <RefreshCw size={13}/> REFRESCAR
       </button>

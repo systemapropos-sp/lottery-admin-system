@@ -5,7 +5,6 @@ import PageHeader from "@/components/ui/PageHeader";
 import DataTable from "@/components/ui/DataTable";
 import type { Column } from "@/components/ui/DataTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { expenseCategories } from "@/data/mockData";
 
 interface CategoriaRow {
   id: string;
@@ -18,7 +17,7 @@ interface CategoriaRow {
 
 export default function CategoriasGastos() {
   const [data, setData] = useState<CategoriaRow[]>(() =>
-    expenseCategories.map((c) => ({
+    ([] as any[]).map((c) => ({
       id: c.id,
       nombre: c.name,
       codigo: c.id.replace("exp-", "CAT-"),

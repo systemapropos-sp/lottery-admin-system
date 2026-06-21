@@ -1,26 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Check, ChevronDown } from "lucide-react";
-// ─── Datos locales NMV (no depende de mockData) ───────────────────────────────
-const bettingPools = [
-  {id:"b01",name:"NMV RD 01",code:"NMV-0001",isActive:true},
-  {id:"b02",name:"NMV RD 02",code:"NMV-0002",isActive:true},
-  {id:"b03",name:"NMV RD 03",code:"NMV-0003",isActive:true},
-  {id:"b04",name:"NMV RD 04",code:"NMV-0004",isActive:true},
-  {id:"b05",name:"NMV RD 05",code:"NMV-0005",isActive:true},
-  {id:"b06",name:"NMV RD 06",code:"NMV-0006",isActive:true},
-  {id:"b07",name:"NMV RD 07",code:"NMV-0007",isActive:true},
-  {id:"b08",name:"NMV RD 08",code:"NMV-0008",isActive:true},
-  {id:"b09",name:"NMV RD 09",code:"NMV-0009",isActive:true},
-  {id:"b10",name:"NMV RD 10",code:"NMV-0010",isActive:true},
-  {id:"b11",name:"NMV RD 11",code:"NMV-0011",isActive:true},
-  {id:"b12",name:"NMV RD 12",code:"NMV-0012",isActive:true},
-  {id:"b13",name:"NMV RD 13",code:"NMV-0013",isActive:true},
-];
-const zones = [
-  {id:"z1",name:"Default",code:"ZON-0001"},
-  {id:"z2",name:"SFM",code:"ZON-0002"},
-];
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,7 +12,9 @@ type PriorityType = "low" | "medium" | "high";
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Notificaciones() {
-  // ─── State ──────────────────────────────────────────────────────────────────
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
+  const bettingPools = bancasRaw.map(b => ({ id: b.id, name: b.name, code: b.code, isActive: b.is_active }));
+  const zones = zonasRaw.map(z => ({ id: z.id, name: z.nombre, code: z.id }));
 
   const [selectedPools, setSelectedPools] = useState<string[]>([]);
   const [selectedZones, setSelectedZones] = useState<string[]>([]);

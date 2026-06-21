@@ -2,48 +2,19 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, ChevronDown, FileDown, FileText, Search, X } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
 function today() { return new Date().toISOString().split("T")[0]; }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const BANCAS_DATA = [
-  { ref:"MATADOR-",  codigo:"MWR-0001", tickets:417, venta:168880,  comisiones:0,      comision2:0, premios:150500, neto:18380,    final:18380    },
-  { ref:"MMW RD 02", codigo:"MWR-0002", tickets:7,   venta:2745,    comisiones:439.20, comision2:0, premios:8050,   neto:-5744.20, final:-5744.20 },
-  { ref:"MMW RD 03", codigo:"MWR-0003", tickets:0,   venta:0,       comisiones:0,      comision2:0, premios:0,      neto:0,        final:0        },
-];
-const SORTEOS_DATA = [
-  { sorteo:"LOTEKA",                  vendido:615,   premios:0,      comisiones:0,     neto:615     },
-  { sorteo:"LA SUERTE",               vendido:6420,  premios:1560,   comisiones:33.60, neto:4826.40 },
-  { sorteo:"LA PRIMERA",              vendido:26930, premios:7020,   comisiones:24,    neto:19886   },
-  { sorteo:"GANA MAS",                vendido:54480, premios:0,      comisiones:88,    neto:54392   },
-  { sorteo:"QUINIELA REAL",           vendido:49930, premios:31680,  comisiones:150.40,neto:18099.60},
-  { sorteo:"SUPER PALE REAL-GANA MAS",vendido:430,   premios:0,      comisiones:0,     neto:430     },
-  { sorteo:"Anguila 10AM",            vendido:19785, premios:116880, comisiones:32,    neto:-97127  },
-  { sorteo:"NEW YORK AM",             vendido:4550,  premios:1050,   comisiones:87.20, neto:3412.80 },
-  { sorteo:"King Lottery AM",         vendido:55,    premios:0,      comisiones:0,     neto:55      },
-  { sorteo:"SUPER PALE NACIONAL-QP",  vendido:180,   premios:0,      comisiones:0,     neto:180     },
-  { sorteo:"NACIONAL",                vendido:2780,  premios:0,      comisiones:0,     neto:2780    },
-  { sorteo:"Anguila 1PM",             vendido:2805,  premios:360,    comisiones:0,     neto:2445    },
-  { sorteo:"LA SUERTE 6:00pm",        vendido:325,   premios:0,      comisiones:0,     neto:325     },
-  { sorteo:"QUINIELA PALE",           vendido:840,   premios:0,      comisiones:0,     neto:840     },
-  { sorteo:"FLORIDA AM",              vendido:1125,  premios:0,      comisiones:24,    neto:1101    },
-  { sorteo:"LOTEDOM",                 vendido:375,   premios:0,      comisiones:0,     neto:375     },
-];
-const COMBOS_DATA = [
-  { combo:"LP+GM",   vendido:12400, comis1:0, comis2:0, premios:8600, balance:3800  },
-  { combo:"QR+LTK",  vendido:8700,  comis1:0, comis2:0, premios:3200, balance:5500  },
-  { combo:"ANG+NY",  vendido:5300,  comis1:0, comis2:0, premios:9100, balance:-3800 },
-];
-const ZONAS_DATA = [
-  { nombre:"Default", cnt:3, p:0, l:9316, w:1300, total:10616, venta:4296620, comisiones:0,    premios:5682920, neto:-1386300, caida:0, final:-1386300 },
-  { nombre:"SFM",     cnt:1, p:0, l:282,  w:30,   total:312,   venta:125550,  comisiones:20088,premios:71360,   neto:34102,   caida:0, final:34102    },
-];
-const ZONAS_LIST = ["Default","SFM"];
-const SORTEOS_LIST = SORTEOS_DATA.map(s => s.sorteo);
-const BANCAS_LIST  = BANCAS_DATA.map(b => b.ref);
+// ─── Sin datos mock — se cargarán desde Supabase ─────────────────────────────
+const BANCAS_DATA:   { ref:string;codigo:string;tickets:number;venta:number;comisiones:number;comision2:number;premios:number;neto:number;final:number }[] = [];
+const SORTEOS_DATA:  { sorteo:string;vendido:number;premios:number;comisiones:number;neto:number }[] = [];
+const COMBOS_DATA:   { combo:string;vendido:number;comis1:number;comis2:number;premios:number;balance:number }[] = [];
+const ZONAS_DATA:    { nombre:string;cnt:number;p:number;l:number;w:number;total:number;venta:number;comisiones:number;premios:number;neto:number;caida:number;final:number }[] = [];
+const SORTEOS_LIST:  string[] = [];
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 const PILLS = ["TODOS","CON VENTAS","CON PREMIOS","CON TICKETS PENDIENTES","CON VENTAS NETAS NEGATIVAS","CON VENTAS NETAS POSITIVAS"] as const;
@@ -95,6 +66,7 @@ function NetoBadge({val}:{val:number}) {
 
 // ─── Tab: General ─────────────────────────────────────────────────────────────
 function TabGeneral() {
+  const { zonas } = useBancasZonas();
   const [fi,setFi]=useState(today()); const [ff,setFf]=useState(today());
   const [selZonas,setSelZonas]=useState<string[]>([]);
   const [showC2,setShowC2]=useState(false);
@@ -129,7 +101,7 @@ function TabGeneral() {
           <input type="date" value={fi} onChange={e=>setFi(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
         <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha final</label>
           <input type="date" value={ff} onChange={e=>setFf(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
-        <MultiSelect label="Zonas" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas}/>
+        <MultiSelect label="Zonas" options={zonas.map(z => z.nombre)} value={selZonas} onChange={setSelZonas}/>
         <Toggle label="Mostrar comisión #2" value={showC2} onChange={setShowC2}/>
         <button className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] shadow-sm transition-colors">
           <RefreshCw size={13}/> VER VENTAS
@@ -205,6 +177,7 @@ function TabGeneral() {
 
 // ─── Tab: Por sorteo ──────────────────────────────────────────────────────────
 function TabPorSorteo() {
+  const { zonas } = useBancasZonas();
   const [fi,setFi]=useState(today()); const [ff,setFf]=useState(today());
   const [selZonas,setSelZonas]=useState<string[]>([]);
   const [perPage,setPerPage]=useState(20);
@@ -229,7 +202,7 @@ function TabPorSorteo() {
           <input type="date" value={fi} onChange={e=>setFi(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
         <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha final</label>
           <input type="date" value={ff} onChange={e=>setFf(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
-        <MultiSelect label="Zonas" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas}/>
+        <MultiSelect label="Zonas" options={zonas.map(z => z.nombre)} value={selZonas} onChange={setSelZonas}/>
         <button className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] shadow-sm">
           <RefreshCw size={13}/> VER VENTAS
         </button>
@@ -287,6 +260,7 @@ function TabPorSorteo() {
 
 // ─── Tab: Combinaciones ───────────────────────────────────────────────────────
 function TabCombinaciones() {
+  const { zonas, bancas } = useBancasZonas();
   const [fi,setFi]=useState(today()); const [ff,setFf]=useState(today());
   const [selSorteos,setSelSorteos]=useState<string[]>([]);
   const [selZonas,setSelZonas]=useState<string[]>([]);
@@ -312,8 +286,8 @@ function TabCombinaciones() {
         <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha final</label>
           <input type="date" value={ff} onChange={e=>setFf(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
         <MultiSelect label="Sorteos" options={SORTEOS_LIST} value={selSorteos} onChange={setSelSorteos}/>
-        <MultiSelect label="Zonas" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas}/>
-        <MultiSelect label="Bancas" options={BANCAS_LIST} value={selBancas} onChange={setSelBancas}/>
+        <MultiSelect label="Zonas" options={zonas.map(z => z.nombre)} value={selZonas} onChange={setSelZonas}/>
+        <MultiSelect label="Bancas" options={bancas.map(b => b.name)} value={selBancas} onChange={setSelBancas}/>
         <button onClick={handleSearch} className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] shadow-sm">
           <RefreshCw size={13}/> VER VENTAS
         </button>
@@ -358,6 +332,7 @@ function TabCombinaciones() {
 
 // ─── Tab: Por zona ────────────────────────────────────────────────────────────
 function TabPorZona() {
+  const { zonas } = useBancasZonas();
   const [fi,setFi]=useState(today()); const [ff,setFf]=useState(today());
   const [selZonas,setSelZonas]=useState<string[]>([]);
   const [showC2,setShowC2]=useState(false);
@@ -391,7 +366,7 @@ function TabPorZona() {
           <input type="date" value={fi} onChange={e=>setFi(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
         <div><label className="text-xs text-[#999] font-medium block mb-1">Fecha final</label>
           <input type="date" value={ff} onChange={e=>setFf(e.target.value)} className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg focus:outline-none focus:border-[#4ECDC4]"/></div>
-        <MultiSelect label="Zonas" options={ZONAS_LIST} value={selZonas} onChange={setSelZonas}/>
+        <MultiSelect label="Zonas" options={zonas.map(z => z.nombre)} value={selZonas} onChange={setSelZonas}/>
         <Toggle label="Mostrar comisión #2" value={showC2} onChange={setShowC2}/>
         <button className="flex items-center gap-2 px-5 py-2 bg-[#4ECDC4] text-white text-sm font-semibold rounded-full hover:bg-[#3DBDB5] shadow-sm">
           <RefreshCw size={13}/> VER VENTAS

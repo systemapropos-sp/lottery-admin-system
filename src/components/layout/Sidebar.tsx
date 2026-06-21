@@ -147,6 +147,16 @@ const menuGroups: MenuGroup[] = [
       { labelKey: "nav.users.login-logs",  route: "/login-logs" },
     ],
   },
+  {
+    key: "zonas",
+    labelKey: "nav.zonas",
+    icon: MapPin,
+    items: [
+      { labelKey: "nav.zones.list",   route: "/zones" },
+      { labelKey: "nav.zones.create", route: "/zones/new" },
+      { labelKey: "nav.zones.manage", route: "/zones/manage" },
+    ],
+  },
   // ── FINANZAS ──
   {
     key: "balances",
@@ -173,8 +183,9 @@ const menuGroups: MenuGroup[] = [
     items: [
       { labelKey: "nav.transactions.list",       route: "/accountable-transactions" },
       { labelKey: "nav.transactions.groups",     route: "/accountable-transactions/groups" },
+      { labelKey: "nav.transactions.entities",   route: "/accountable-entities" },
       { labelKey: "nav.transactions.summary",    route: "/accountable-transactions/summary" },
-      { labelKey: "nav.transactions.categories", route: "/accountable-transactions/categories" },
+      { labelKey: "nav.transactions.recargas",   route: "/accountable-transactions/recargas" },
     ],
   },
   {
@@ -218,15 +229,6 @@ const menuGroups: MenuGroup[] = [
     items: [
       { labelKey: "nav.sorteos.list",     route: "/sortition-informations" },
       { labelKey: "nav.sorteos.schedule", route: "/sortition-schedules" },
-    ],
-  },
-  {
-    key: "zonas",
-    labelKey: "nav.zonas",
-    icon: MapPin,
-    items: [
-      { labelKey: "nav.zones.list",   route: "/zones" },
-      { labelKey: "nav.zones.create", route: "/zones/new" },
     ],
   },
   {

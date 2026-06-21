@@ -38,15 +38,8 @@ interface OtherEntity {
   prestamo: number;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const employees: Employee[] = [];
-
-const banks: Bank[] = [];
-
-// zoneEntities: loaded dynamically from Supabase via useBancasZonas
-
-const others: OtherEntity[] = [];
+// Module-level arrays replaced by real Supabase data in component state
+// zoneEntities: loaded dynamically via useZonasStore
 
 const tabs = ["Bancas", "Empleados", "Bancos", "Zonas", "Otros"] as const;
 type TabType = (typeof tabs)[number];
@@ -160,6 +153,18 @@ export default function ListaEntidades() {
   const [editForm, setEditForm] = useState<BettingPool | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // ─── Entidades state (Empleados, Bancos, Otros) ────────────────────────────
+  const [entidadesData, setEntidadesData] = useState<{id:string;nombre:string;codigo:string;tipo:string;balance:number;caida_acumulada:number;prestamo:number}[]>([]);
+
+  async function fetchEntidades() {
+    const { data } = await supabase
+      .from("entidades")
+      .select("id,nombre,codigo,tipo,balance,caida_acumulada,prestamo")
+      .eq("business_id", BUSINESS_ID)
+      .eq("is_active", true);
+    if (data) setEntidadesData(data);
+  }
+
   // ─── Supabase stores ─────────────────────────────────────────────────────────
   const { bancas, fetchBancas, createBanca, updateBanca } = useBancasStore();
   const { zonas, fetchZonas } = useZonasStore();
@@ -167,8 +172,22 @@ export default function ListaEntidades() {
   useEffect(() => {
     fetchBancas();
     fetchZonas();
+    fetchEntidades();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Derived arrays from entidadesData
+  const employees: Employee[] = entidadesData
+    .filter(e => e.tipo === "empleados")
+    .map(e => ({ id: e.id, name: e.nombre, code: e.codigo, balance: e.balance, caidaAcumulada: e.caida_acumulada, prestamo: e.prestamo }));
+
+  const banks: Bank[] = entidadesData
+    .filter(e => e.tipo === "bancos")
+    .map(e => ({ id: e.id, name: e.nombre, code: e.codigo, balance: e.balance, caidaAcumulada: e.caida_acumulada, prestamo: e.prestamo }));
+
+  const others: OtherEntity[] = entidadesData
+    .filter(e => e.tipo === "otros")
+    .map(e => ({ id: e.id, name: e.nombre, code: e.codigo, balance: e.balance, caidaAcumulada: e.caida_acumulada, prestamo: e.prestamo }));
 
   // Map Banca (Supabase) → BettingPool (display format)
   const bettingPools: BettingPool[] = bancas.map(b => ({
@@ -208,10 +227,10 @@ export default function ListaEntidades() {
   };
 
   const filteredPools = useMemo(() => filterByText(bettingPools), [filter, bettingPools]);
-  const filteredEmployees = useMemo(() => filterByText(employees), [filter]);
-  const filteredBanks = useMemo(() => filterByText(banks), [filter]);
+  const filteredEmployees = useMemo(() => filterByText(employees), [filter, employees]);
+  const filteredBanks = useMemo(() => filterByText(banks), [filter, banks]);
   const filteredZones = useMemo(() => filterByText(zoneRows), [filter, zoneRows]);
-  const filteredOthers = useMemo(() => filterByText(others), [filter]);
+  const filteredOthers = useMemo(() => filterByText(others), [filter, others]);
 
   // ─── Balance Cell ───────────────────────────────────────────────────────────
 
@@ -469,7 +488,7 @@ export default function ListaEntidades() {
       <AnimatePresence>
         {showCrearModal&&<CrearEntidadModal key="crear" activeTab={activeTab}
           onClose={()=>setShowCrearModal(false)}
-          onCreated={()=>{ fetchBancas(); fetchZonas(); }}
+          onCreated={()=>{ fetchBancas(); fetchZonas(); fetchEntidades(); }}
         />}
       </AnimatePresence>
 

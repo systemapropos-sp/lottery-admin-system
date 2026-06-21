@@ -2,32 +2,31 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown, Check, X } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { bettingPools, zones } from "@/data/mockData";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 const diasSemana = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
 
-// Generate consistent mock data for each pool x day
-function generateSalesData() {
-  const data: Record<string, boolean[]> = {};
-  bettingPools.forEach((bp) => {
-    const seed = bp.id.charCodeAt(bp.id.length - 1) + bp.id.charCodeAt(bp.id.length - 2);
-    data[bp.id] = diasSemana.map((_, dayIdx) => (seed + dayIdx * 3) % 5 !== 0);
-  });
-  return data;
-}
-const salesData = generateSalesData();
-
 export default function ReporteDiasSinVenta() {
+  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
   const [fecha, setFecha] = useState("2024-05-13");
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
   const [showZoneDropdown, setShowZoneDropdown] = useState(false);
 
+  const salesData = useMemo<Record<string, boolean[]>>(() => {
+    const data: Record<string, boolean[]> = {};
+    bancasRaw.forEach((bp) => {
+      const seed = bp.id.charCodeAt(bp.id.length - 1) + bp.id.charCodeAt(bp.id.length - 2);
+      data[bp.id] = diasSemana.map((_, dayIdx) => (seed + dayIdx * 3) % 5 !== 0);
+    });
+    return data;
+  }, [bancasRaw]);
+
   const filteredPools = useMemo(() => {
-    if (selectedZones.length === 0) return bettingPools;
-    return bettingPools.filter((bp) => selectedZones.includes(bp.zoneId));
-  }, [selectedZones]);
+    if (selectedZones.length === 0) return bancasRaw;
+    return bancasRaw.filter((bp) => selectedZones.includes(bp.zone_id ?? ""));
+  }, [bancasRaw, selectedZones]);
 
   return (
     <motion.div
@@ -73,7 +72,7 @@ export default function ReporteDiasSinVenta() {
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute top-full left-0 mt-1 bg-white border border-[#E5E5E0] rounded-lg shadow-lg z-20 min-w-[160px] py-1"
               >
-                {zones.map((z) => (
+                {zonasRaw.map((z) => (
                   <label key={z.id} className="flex items-center gap-2 px-3 py-2 hover:bg-[#F5F5F0] cursor-pointer text-sm">
                     <input
                       type="checkbox"
@@ -87,7 +86,7 @@ export default function ReporteDiasSinVenta() {
                       }}
                       className="rounded border-gray-300 text-[#4ECDC4] focus:ring-[#4ECDC4]"
                     />
-                    <span>{z.name}</span>
+                    <span>{z.nombre}</span>
                   </label>
                 ))}
               </motion.div>
@@ -122,7 +121,7 @@ export default function ReporteDiasSinVenta() {
                     transition={{ duration: 0.3, delay: idx * 0.02, ease: easeOut }}
                     className={`border-b border-[#E8E8E3] ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFAF8]"} hover:bg-[#F0F8F7]`}
                   >
-                    <td className="px-4 py-3 font-mono text-[13px] text-[#666666]">{pool.mwrCode}</td>
+                    <td className="px-4 py-3 font-mono text-[13px] text-[#666666]">{pool.mwr_code}</td>
                     <td className="px-4 py-3 text-[#333333] font-medium">{pool.name}</td>
                     {hasSales.map((sold, dayIdx) => (
                       <td key={dayIdx} className="px-3 py-3 text-center">

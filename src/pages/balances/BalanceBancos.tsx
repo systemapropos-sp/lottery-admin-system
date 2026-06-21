@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import PageHeader from "@/components/ui/PageHeader";
-import { banks } from "@/data/mockData";
+// banks vacío — datos reales vendrán de Supabase
+const banks: { id:string; name:string; accountNumber:string; balance:number; }[] = [];
 
 const easeOut = [0.16, 1, 0.3, 1] as [number, number, number, number];
 

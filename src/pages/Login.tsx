@@ -27,9 +27,9 @@ function fmtTime(d: Date) {
 }
 
 // ─── Admin PIN Map ────────────────────────────────────────────────────────────
-// IMPORTANTE: username debe coincidir con mockData.ts adminUsers
+// IMPORTANTE: user debe coincidir con admin_users.username en Supabase
 const ADMIN_PINS: Record<string, { user: string; pass: string; email: string }> = {
-  "0587": { user: "RDV-01", pass: "Producers0587@", email: "duepostllc@gmail.com" },
+  "0587": { user: "alex", pass: "Producers0587@", email: "duepostllc@gmail.com" },
 };
 
 // ─── Animated Background Blobs ───────────────────────────────────────────────
@@ -367,16 +367,27 @@ export default function Login() {
                 {keys.map((k, i) => (
                   <motion.button
                     key={i}
+                    type="button"
                     whileTap={k ? { scale: 0.9 } : {}}
-                    onClick={() => k === "⌫" ? delDigit() : k ? appendDigit(k) : undefined}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      if (!k || isLoading) return;
+                      if (k === "⌫") delDigit();
+                      else appendDigit(k);
+                    }}
                     disabled={isLoading}
-                    className={`h-14 rounded-2xl text-xl font-bold transition-all disabled:opacity-50 ${
+                    className={`h-14 rounded-2xl text-xl font-bold transition-all disabled:opacity-50 select-none ${
                       !k ? "invisible" :
                       k === "⌫"
-                        ? "bg-red-50 text-red-400 hover:bg-red-100 border border-red-100"
-                        : "bg-gradient-to-br from-gray-50 to-white text-gray-700 hover:from-teal-50 hover:text-teal-600 border border-gray-100 hover:border-teal-200 hover:shadow-sm"
+                        ? "bg-red-50 text-red-400 active:bg-red-100 border border-red-100"
+                        : "bg-gradient-to-br from-gray-50 to-white text-gray-700 active:from-teal-50 active:text-teal-600 border border-gray-100 hover:border-teal-200"
                     }`}
-                    style={{ boxShadow: k && k !== "⌫" ? "0 2px 4px rgba(0,0,0,0.06)" : undefined }}
+                    style={{
+                      boxShadow: k && k !== "⌫" ? "0 2px 4px rgba(0,0,0,0.06)" : undefined,
+                      touchAction: "manipulation",
+                      WebkitTapHighlightColor: "transparent",
+                      cursor: k ? "pointer" : "default",
+                    }}
                   >
                     {k}
                   </motion.button>

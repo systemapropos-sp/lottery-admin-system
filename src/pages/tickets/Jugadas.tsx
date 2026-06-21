@@ -4,44 +4,19 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, ChevronDown, FileText, Printer } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useBancasZonas } from "@/context/BancasZonasContext";
 
 function fmt(n: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n); }
 function today() { return new Date().toISOString().split("T")[0]; }
 
 const SORTEOS_LIST = ["Anguila 10AM","GANA MAS","LA PRIMERA","NEW YORK AM","NEW YORK PM","FLORIDA AM","QUINIELA REAL","LOTEKA","LA SUERTE","LOTEDOM","KING LOTTERY AM"];
-const ZONAS_LIST   = ["Default","SFM"];
 
-// Mock data — sorted desc in display
-const DIR_RAW = [
-  {num:"04",amt:995},{num:"81",amt:675},{num:"18",amt:640},{num:"61",amt:500},
-  {num:"40",amt:400},{num:"15",amt:370},{num:"17",amt:365},{num:"32",amt:355},
-  {num:"58",amt:345},{num:"14",amt:325},{num:"30",amt:300},{num:"73",amt:300},
-  {num:"83",amt:280},{num:"23",amt:285},{num:"92",amt:265},{num:"52",amt:200},
-  {num:"07",amt:200},{num:"13",amt:225},{num:"22",amt:215},{num:"24",amt:210},
-  {num:"00",amt:135},{num:"26",amt:205},{num:"10",amt:195},{num:"31",amt:195},
-  {num:"96",amt:200},{num:"28",amt:225},{num:"29",amt:115},{num:"46",amt:100},
-  {num:"93",amt:125},{num:"27",amt:150},{num:"64",amt:125},{num:"41",amt:125},
-  {num:"94",amt:170},{num:"95",amt:105},{num:"25",amt:155},{num:"50",amt:175},
-  {num:"69",amt:175},{num:"87",amt:190},{num:"88",amt:190},{num:"89",amt:190},
-  {num:"12",amt:175},{num:"05",amt:175},{num:"19",amt:120},{num:"20",amt:160},
-  {num:"21",amt:125},{num:"56",amt:125},{num:"91",amt:25},{num:"85",amt:15},
-].sort((a,b) => b.amt - a.amt);
-
-const PALE_RAW = [
-  {num:"19-79",amt:350},{num:"11-70",amt:200},{num:"14-23",amt:200},{num:"22-73",amt:200},
-  {num:"04-40",amt:175},{num:"37-73",amt:135},{num:"00-87",amt:100},{num:"04-61",amt:100},
-  {num:"07-27",amt:100},{num:"08-30",amt:100},{num:"10-27",amt:100},{num:"13-76",amt:100},
-  {num:"18-40",amt:100},{num:"19-48",amt:100},{num:"19-56",amt:100},{num:"19-65",amt:100},
-  {num:"19-83",amt:100},
-].sort((a,b) => b.amt - a.amt);
-
-const TRIP_RAW = [
-  {num:"13-19-58",amt:50},{num:"19-56-83",amt:50},{num:"19-65-83",amt:50},
-  {num:"30-69-76",amt:25},{num:"56-64-94",amt:20},{num:"03-34-37",amt:5},
-  {num:"05-37-73",amt:5},{num:"28-58-94",amt:5},{num:"28-58-95",amt:5},{num:"37-42-79",amt:5},
-].sort((a,b) => b.amt - a.amt);
+const DIR_RAW:  { num: string; amt: number }[] = [];
+const PALE_RAW: { num: string; amt: number }[] = [];
+const TRIP_RAW: { num: string; amt: number }[] = [];
 
 export default function Jugadas() {
+  const { zonas } = useBancasZonas();
   const [fecha, setFecha]   = useState(today());
   const [sorteo, setSorteo] = useState("Anguila 10AM");
   const [banca, setBanca]   = useState("");
@@ -119,8 +94,8 @@ export default function Jugadas() {
           <label className="text-xs text-[#999] font-medium block mb-1">Zonas</label>
           <div className="relative">
             <select className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg appearance-none focus:outline-none focus:border-[#4ECDC4] pr-8 min-w-[160px]">
-              <option>{ZONAS_LIST.length} seleccionadas</option>
-              {ZONAS_LIST.map(z => <option key={z}>{z}</option>)}
+              <option>{zonas.length} seleccionadas</option>
+              {zonas.map(z => <option key={z.id} value={z.nombre}>{z.nombre}</option>)}
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none" />
           </div>

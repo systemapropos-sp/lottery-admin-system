@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutGrid, List, Plus, Search, Filter, Download,
@@ -8,6 +8,7 @@ import {
   Receipt, Wallet, CreditCard, ArrowUpRight, ArrowDownRight,
   Trophy, HandCoins, X,
 } from "lucide-react";
+import { useContabilidadStore } from "@/store/contabilidadStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,7 +174,11 @@ function NuevaEntradaModal({ onSave, onClose }: {onSave:(t:Transaccion)=>void; o
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ContabilidadPage() {
-  const [rows, setRows] = useState<Transaccion[]>(TRANSACTIONS);
+  const { entradas, fetchEntradas, createEntrada, deleteEntrada } = useContabilidadStore();
+  const rows = entradas as unknown as Transaccion[];
+  useEffect(() => { fetchEntradas(); }, [fetchEntradas]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_unused, setRows] = useState<Transaccion[]>([]);
   const [activeTab, setActiveTab] = useState<Categoria>("resumen");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [search, setSearch] = useState("");
@@ -348,7 +353,7 @@ export default function ContabilidadPage() {
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button className="w-6 h-6 rounded flex items-center justify-center text-blue-400 hover:bg-blue-50"><Eye size={12}/></button>
                       <button className="w-6 h-6 rounded flex items-center justify-center text-teal-400 hover:bg-teal-50"><Edit2 size={12}/></button>
-                      <button onClick={()=>setRows(p=>p.filter(r=>r.id!==t.id))} className="w-6 h-6 rounded flex items-center justify-center text-red-400 hover:bg-red-50"><Trash2 size={12}/></button>
+                      <button onClick={()=>deleteEntrada(t.id)} className="w-6 h-6 rounded flex items-center justify-center text-red-400 hover:bg-red-50"><Trash2 size={12}/></button>
                     </div>
                   </motion.div>
                 );
@@ -386,7 +391,7 @@ export default function ContabilidadPage() {
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button className="w-7 h-7 rounded-lg flex items-center justify-center text-blue-400 hover:bg-blue-50"><Eye size={13}/></button>
                         <button className="w-7 h-7 rounded-lg flex items-center justify-center text-teal-400 hover:bg-teal-50"><Edit2 size={13}/></button>
-                        <button onClick={()=>setRows(p=>p.filter(r=>r.id!==t.id))} className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50"><Trash2 size={13}/></button>
+                        <button onClick={()=>deleteEntrada(t.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50"><Trash2 size={13}/></button>
                       </div>
                     </div>
                   </div>
@@ -401,7 +406,7 @@ export default function ContabilidadPage() {
       <AnimatePresence>
         {showModal&&(
           <NuevaEntradaModal key="modal"
-            onSave={t=>{setRows(p=>[t,...p]);setShowModal(false);}}
+            onSave={t=>{ createEntrada({ fecha:t.fecha, descripcion:t.descripcion, categoria:t.categoria as any, subcategoria:t.subcategoria, monto:t.monto, tipo:t.tipo, estado:t.estado, referencia:t.referencia, notas:"" }); setShowModal(false); }}
             onClose={()=>setShowModal(false)}/>
         )}
       </AnimatePresence>

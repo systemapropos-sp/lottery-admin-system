@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Pencil, Trash2, Plus, Mail, X, Save, Tag } from "lucide-react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useReceptoresStore } from "@/store/receptoresStore";
 
 interface Receptor {
   id: string;
@@ -24,14 +25,7 @@ const ALL_EMAIL_TYPES = [
   "Balances",
 ];
 
-const receptoresData: Receptor[] = [
-  {
-    id: "rec-001",
-    email: "smartboyslab@gmail.com",
-    zones: ["General"],
-    emailTypes: ["Reportes diarios", "Alertas de seguridad", "Resultados", "Reportes de ventas"],
-  },
-];
+// Datos reales desde Supabase — ver receptoresStore
 
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
 function EditReceptorModal({
@@ -184,7 +178,18 @@ function EditReceptorModal({
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function ListaReceptores() {
   const navigate = useNavigate();
-  const [receptores, setReceptores] = useState<Receptor[]>(receptoresData);
+  const { receptores: storeReceptores, fetchReceptores, deleteReceptor, updateReceptor } = useReceptoresStore();
+
+  // Map snake_case (Supabase) → camelCase (componente)
+  const receptores: Receptor[] = storeReceptores.map((r) => ({
+    id: r.id,
+    email: r.email,
+    zones: r.zones,
+    emailTypes: r.email_types,
+  }));
+
+  useEffect(() => { fetchReceptores(); }, [fetchReceptores]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Receptor | null>(null);
   const [editTarget, setEditTarget] = useState<Receptor | null>(null);
@@ -196,12 +201,16 @@ export default function ListaReceptores() {
   }, [receptores, searchQuery]);
 
   function handleDelete(r: Receptor) {
-    setReceptores((prev) => prev.filter((x) => x.id !== r.id));
+    deleteReceptor(r.id);
     setDeleteTarget(null);
   }
 
   function handleSaveEdit(updated: Receptor) {
-    setReceptores((prev) => prev.map((r) => r.id === updated.id ? updated : r));
+    updateReceptor(updated.id, {
+      email: updated.email,
+      zones: updated.zones,
+      email_types: updated.emailTypes,
+    });
     setEditTarget(null);
   }
 

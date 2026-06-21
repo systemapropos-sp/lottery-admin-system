@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, ChevronDown, Search, X } from "lucide-react";
+import { RefreshCw, ChevronDown, Search, X, AlertTriangle } from "lucide-react";
 import { useBancasZonas } from "@/context/BancasZonasContext";
+import { supabase, BUSINESS_ID } from "@/lib/supabase";
 
 // --- Tipos compartidos --------------------------------------------------------
 const fmt = (n: number) =>
@@ -69,12 +70,17 @@ function DateInput({ label, value, onChange }: { label: string; value: string; o
   );
 }
 
-function ActionBtn({ label, variant = "primary", onClick }: { label: string; variant?: "primary" | "secondary" | "ghost"; onClick?: () => void }) {
+function ActionBtn({ label, variant = "primary", onClick, loading = false, disabled = false }: {
+  label: string; variant?: "primary" | "secondary" | "ghost";
+  onClick?: () => void; loading?: boolean; disabled?: boolean;
+}) {
   const cls = variant === "primary" ? "bg-[#14B8A6] text-white hover:bg-[#0F766E] shadow-sm"
     : variant === "secondary" ? "bg-white text-[#333] border border-[#E5E5E0] hover:bg-[#F5F5F0] hover:border-[#14B8A6]"
     : "bg-[#F5F5F0] text-[#666] hover:bg-[#EBEBEB]";
   return (
-    <button onClick={onClick} className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all active:scale-[0.97] ${cls}`}>
+    <button onClick={onClick} disabled={disabled || loading}
+      className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5 ${cls}`}>
+      {loading && <RefreshCw size={11} className="animate-spin"/>}
       {label}
     </button>
   );
@@ -125,7 +131,7 @@ function QuickFilter({ value, onChange }: { value: string; onChange: (v: string)
       <div className="relative">
         <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#999]" />
         <input value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="Filtro r�pido"
+          placeholder="Filtro rápido"
           className="pl-7 pr-7 py-1.5 text-xs border border-[#E5E5E0] rounded-lg bg-[#FAFAFA] focus:outline-none focus:border-[#14B8A6] w-44 transition-colors" />
         {value && (
           <button onClick={() => onChange("")} className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -154,28 +160,120 @@ function FilterPills({ active, onChange }: { active: FilterPill; onChange: (p: F
   );
 }
 
+// --- CSV / PDF helpers --------------------------------------------------------
+function exportCSV(rows: GeneralRow[], filename: string) {
+  const headers = ["Ref","Código","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"];
+  const csvRows = [headers.join(","), ...rows.map(r =>
+    [r.ref, r.codigo, r.p, r.l, r.w, r.total,
+      r.venta.toFixed(2), r.comisiones.toFixed(2), r.premios.toFixed(2),
+      r.neto.toFixed(2), r.final.toFixed(2), r.balance.toFixed(2)].join(",")
+  )];
+  const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function printTable(rows: GeneralRow[], date: string) {
+  const fmt2 = (n: number) => `$${n.toLocaleString("en-US",{minimumFractionDigits:2})}`;
+  const html = `<html><head><title>Ventas del Día ${date}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px}table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ccc;padding:4px 8px;text-align:right}th{background:#f0f0f0;text-align:center}
+    td:first-child,td:nth-child(2){text-align:left}h2{text-align:center}</style></head>
+    <body><h2>Ventas del Día — ${date}</h2><table>
+    <thead><tr>${["Ref","Código","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"].map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(r=>`<tr><td>${r.ref}</td><td>${r.codigo}</td><td>${r.p}</td><td>${r.l}</td><td>${r.w}</td>
+    <td>${r.total}</td><td>${fmt2(r.venta)}</td><td>${fmt2(r.comisiones)}</td><td>${fmt2(r.premios)}</td>
+    <td>${fmt2(r.neto)}</td><td>${fmt2(r.final)}</td><td>${fmt2(r.balance)}</td></tr>`).join("")}</tbody>
+    </table></body></html>`;
+  const w = window.open("","_blank"); if (!w) return;
+  w.document.write(html); w.document.close(); w.print();
+}
+
 // --- TAB GENERAL -------------------------------------------------------------
 function TabGeneral() {
   const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
-  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name, codigo: b.code }));
+  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name ?? "", codigo: b.code ?? "" }));
   const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
-  const generalRows: GeneralRow[] = BANCAS.map((b) => ({
-    id: b.id, ref: b.ref, codigo: b.codigo,
-    p: 0, l: 0, w: 0, total: 0,
-    venta: 0, comisiones: 0, premios: 0,
-    neto: 0, final: 0, balance: 0,
-  }));
+
   const [date, setDate]       = useState(new Date().toISOString().slice(0, 10));
   const [pill, setPill]       = useState<FilterPill>("TODOS");
   const [subTab, setSubTab]   = useState<"bancas" | "resultados">("bancas");
   const [quick, setQuick]     = useState("");
   const [selZonas, setSelZonas] = useState<string[]>(ZONAS.map((z) => z.nombre));
+  const [rows, setRows]       = useState<GeneralRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded]   = useState(false);
+  const [warnMsg, setWarnMsg] = useState("");
+
+  const fetchVentas = useCallback(async () => {
+    setLoading(true); setWarnMsg("");
+    try {
+      const { data: tickets, error } = await supabase
+        .from("tickets")
+        .select("id, banca_code, created_at")
+        .eq("business_id", BUSINESS_ID)
+        .gte("created_at", `${date}T00:00:00`)
+        .lte("created_at", `${date}T23:59:59`);
+
+      if (error) throw error;
+
+      const { data: plays } = await supabase
+        .from("ticket_plays")
+        .select("ticket_id, amount, prize")
+        .in("ticket_id", (tickets ?? []).map((t: { id: string }) => t.id));
+
+      // Group by banca_code
+      const map = new Map<string, GeneralRow>();
+      BANCAS.forEach(b => {
+        map.set(b.codigo, {
+          id: b.id, ref: b.ref, codigo: b.codigo,
+          p: 0, l: 0, w: 0, total: 0,
+          venta: 0, comisiones: 0, premios: 0,
+          neto: 0, final: 0, balance: 0,
+        });
+      });
+
+      (tickets ?? []).forEach((t: { id: string; banca_code: string }) => {
+        const row = map.get(t.banca_code);
+        if (row) row.total += 1;
+      });
+
+      (plays ?? []).forEach((p: { ticket_id: string; amount: number; prize: number }) => {
+        const ticket = (tickets ?? []).find((t: { id: string; banca_code: string }) => t.id === p.ticket_id);
+        if (!ticket) return;
+        const row = map.get(ticket.banca_code);
+        if (row) {
+          row.venta += p.amount ?? 0;
+          row.premios += p.prize ?? 0;
+          row.neto = row.venta - row.premios - row.comisiones;
+          row.final = row.neto;
+          row.balance = row.neto;
+        }
+      });
+
+      setRows([...map.values()]);
+      setLoaded(true);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error de conexión";
+      setWarnMsg("Error al cargar datos: " + msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [date, BANCAS]);
+
+  const displayRows = loaded ? rows : BANCAS.map(b => ({
+    id: b.id, ref: b.ref, codigo: b.codigo,
+    p: 0, l: 0, w: 0, total: 0,
+    venta: 0, comisiones: 0, premios: 0,
+    neto: 0, final: 0, balance: 0,
+  }));
 
   const filtered = useMemo(() => {
-    const byPill = applyPill(generalRows, pill);
+    const byPill = applyPill(displayRows, pill);
     const q = quick.toLowerCase();
     return q ? byPill.filter((r) => r.ref.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q)) : byPill;
-  }, [pill, quick]);
+  }, [displayRows, pill, quick]);
 
   const totals = useMemo(() => filtered.reduce((acc, r) => ({
     p: acc.p + r.p, l: acc.l + r.l, w: acc.w + r.w,
@@ -186,16 +284,28 @@ function TabGeneral() {
 
   return (
     <div className="space-y-4">
+      {warnMsg && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+          <AlertTriangle size={16}/> {warnMsg}
+          <button onClick={() => setWarnMsg("")} className="ml-auto text-amber-400 hover:text-amber-600"><X size={14}/></button>
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-[#E5E5E0] p-4 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
-          <DateInput label="Fecha" value={date} onChange={setDate} />
+          <DateInput label="Fecha" value={date} onChange={() => setLoaded(false)} />
+          <input type="date" value={date} onChange={e => { setDate(e.target.value); setLoaded(false); }}
+            className="px-3 py-1.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#14B8A6] transition-colors" />
           <MultiSelect label="Zonas" options={ZONAS.map((z) => z.nombre)} selected={selZonas} onChange={setSelZonas} />
           <div className="flex flex-wrap gap-2 flex-1 justify-end">
-            <ActionBtn label="VER VENTAS" variant="primary" />
-            <ActionBtn label="PDF" variant="secondary" />
-            <ActionBtn label="CSV" variant="secondary" />
-            <ActionBtn label="PROCESAR TICKETS DE HOY" variant="ghost" />
-            <ActionBtn label="PROCESAR VENTAS DE AYER" variant="ghost" />
+            <ActionBtn label="VER VENTAS" variant="primary" loading={loading} onClick={fetchVentas} />
+            <ActionBtn label="PDF" variant="secondary"
+              onClick={() => printTable(filtered, date)} disabled={!loaded} />
+            <ActionBtn label="CSV" variant="secondary"
+              onClick={() => exportCSV(filtered, `ventas-${date}.csv`)} disabled={!loaded} />
+            <ActionBtn label="PROCESAR TICKETS DE HOY" variant="ghost"
+              onClick={() => setWarnMsg("⚠️ Función PROCESAR en desarrollo — se habilitará próximamente.")} />
+            <ActionBtn label="PROCESAR VENTAS DE AYER" variant="ghost"
+              onClick={() => setWarnMsg("⚠️ Función PROCESAR en desarrollo — se habilitará próximamente.")} />
           </div>
         </div>
         <TotalBadge label="Neto (banca/grupos/agentes)" amount={totals.neto} />
@@ -223,7 +333,7 @@ function TabGeneral() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
-              {["Ref.","C�digo","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"].map((h) => (
+              {["Ref.","Código","P","L","W","Total","Venta","Comisiones","Premios","Neto","Final","Balance"].map((h) => (
                 <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555] whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -265,7 +375,7 @@ function TabGeneral() {
           </tfoot>
         </table>
       </div>
-      <p className="text-xs text-[#999]">Mostrando {filtered.length} de {generalRows.length} entradas</p>
+      <p className="text-xs text-[#999]">Mostrando {filtered.length} de {displayRows.length} entradas</p>
     </div>
   );
 }
@@ -422,7 +532,7 @@ function TabCombinaciones() {
       <div className="overflow-x-auto rounded-xl border border-[#E5E5E0]">
         <table className="w-full text-sm">
           <thead><tr className="bg-[#F5F5F0] border-b border-[#E5E5E0]">
-            {["Combinaci�n","Total Vendido","Total comisiones","Total comisiones 2","Total premios","Balances"].map((h) => (
+            {["Combinación","Total Vendido","Total comisiones","Total comisiones 2","Total premios","Balances"].map((h) => (
               <th key={h} className="px-3 py-2.5 text-xs font-semibold text-[#555] text-left">{h}</th>
             ))}
           </tr></thead>
@@ -508,7 +618,7 @@ function TabPorZona() {
   );
 }
 
-// --- TAB CATEGOR�A DE PREMIOS -------------------------------------------------
+// --- TAB CATEGORÍA DE PREMIOS -------------------------------------------------
 function TabCategPremios({ tipo }: { tipo: "directo" | "pale" }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [quick, setQuick] = useState("");
@@ -567,19 +677,10 @@ function TabCategPremios({ tipo }: { tipo: "directo" | "pale" }) {
 }
 
 // --- TABS BAR -----------------------------------------------------------------
-const TABS = ["General","Banca por sorteo","Por sorteo","Combinaciones","Por zona","Categor�a de Premios","Categor�a de Premios para Pale"] as const;
+const TABS = ["General","Banca por sorteo","Por sorteo","Combinaciones","Por zona","Categoría de Premios","Categoría de Premios para Pale"] as const;
 type Tab = typeof TABS[number];
 
 export default function VentasDelDia() {
-  const { bancas: bancasRaw, zonas: zonasRaw } = useBancasZonas();
-  const BANCAS = bancasRaw.map(b => ({ id: b.id, ref: b.name ?? "", codigo: b.code ?? "" }));
-  const ZONAS = zonasRaw.map(z => ({ id: z.id, nombre: z.nombre }));
-  const generalRows: GeneralRow[] = BANCAS.map((b) => ({
-    id: b.id, ref: b.ref, codigo: b.codigo,
-    p: 0, l: 0, w: 0, total: 0,
-    venta: 0, comisiones: 0, premios: 0,
-    neto: 0, final: 0, balance: 0,
-  }));
   const [activeTab, setActiveTab] = useState<Tab>("General");
 
   return (
@@ -603,8 +704,8 @@ export default function VentasDelDia() {
           {activeTab==="Por sorteo"                     && <TabPorSorteo />}
           {activeTab==="Combinaciones"                  && <TabCombinaciones />}
           {activeTab==="Por zona"                       && <TabPorZona />}
-          {activeTab==="Categor�a de Premios"           && <TabCategPremios tipo="directo" />}
-          {activeTab==="Categor�a de Premios para Pale" && <TabCategPremios tipo="pale" />}
+          {activeTab==="Categoría de Premios"           && <TabCategPremios tipo="directo" />}
+          {activeTab==="Categoría de Premios para Pale" && <TabCategPremios tipo="pale" />}
         </motion.div>
       </AnimatePresence>
     </motion.div>
