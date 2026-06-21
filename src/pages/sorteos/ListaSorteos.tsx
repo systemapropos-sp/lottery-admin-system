@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pencil, Trash2, Search, X, Check, LayoutList, Power, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X, LayoutList, Power, ChevronUp, ChevronDown, RefreshCw, CloudUpload } from "lucide-react";
 import { useSorteosStore, type Sorteo } from "@/store/sorteosStore";
 
 // ─── Modal Agregar / Editar Sorteo ───────────────────────────────────────────
@@ -110,7 +110,7 @@ function ConfirmDelete({ nombre, onConfirm, onCancel }:{nombre:string;onConfirm:
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ListaSorteos() {
-  const { sorteos, addSorteo, updateSorteo, deleteSorteo, toggleActivo } = useSorteosStore();
+  const { sorteos, addSorteo, updateSorteo, deleteSorteo, toggleActivo, loadFromSupabase, syncAllToSupabase } = useSorteosStore();
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -121,6 +121,26 @@ export default function ListaSorteos() {
   const PAGE_SIZE = 10;
   const [sortField, setSortField] = useState<"nombre"|"abreviacion"|"horario"|"activo"|null>(null);
   const [sortDir, setSortDir] = useState<"asc"|"desc">("asc");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // ── Cargar sorteos de Supabase al montar ──────────────────────────────────
+  useEffect(() => { loadFromSupabase(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Push completo a Supabase (reemplaza todo) ─────────────────────────────
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      await syncAllToSupabase();
+      setSyncMsg({ ok: true, text: `✅ ${sorteos.length} sorteos sincronizados a Supabase` });
+    } catch {
+      setSyncMsg({ ok: false, text: '❌ Error al sincronizar. Ver consola.' });
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMsg(null), 4000);
+    }
+  };
 
   function toggleSort(f:"nombre"|"abreviacion"|"horario"|"activo"){
     if(sortField===f) setSortDir(d=>d==="asc"?"desc":"asc");
@@ -153,16 +173,38 @@ export default function ListaSorteos() {
   return (
     <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.3}} className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#333]">Sorteos</h1>
           <p className="text-sm text-[#999] mt-0.5">{activosCount} activos de {sorteos.length} sorteos totales</p>
         </div>
-        <button onClick={()=>setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#14B8A6] text-white text-sm font-semibold rounded-xl hover:bg-[#0F766E] shadow-sm transition-colors active:scale-[0.97]">
-          <Plus size={16}/> Agregar Sorteo
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Cargar desde Supabase */}
+          <button onClick={() => loadFromSupabase()}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E5E5E0] text-[#555] text-sm font-medium rounded-xl hover:border-[#14B8A6] transition-colors"
+            title="Recargar sorteos desde Supabase">
+            <RefreshCw size={14}/> Recargar
+          </button>
+          {/* Sincronizar a Supabase (push completo) */}
+          <button onClick={handleSync} disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#0EA5E9] text-white text-sm font-semibold rounded-xl hover:bg-[#0284C7] shadow-sm transition-colors active:scale-[0.97] disabled:opacity-60"
+            title="Enviar todos los sorteos a Supabase (reemplaza lista)">
+            <CloudUpload size={14}/> {syncing ? "Sincronizando..." : "☁ Sync a Supabase"}
+          </button>
+          <button onClick={()=>setShowAdd(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#14B8A6] text-white text-sm font-semibold rounded-xl hover:bg-[#0F766E] shadow-sm transition-colors active:scale-[0.97]">
+            <Plus size={16}/> Agregar Sorteo
+          </button>
+        </div>
       </div>
+
+      {/* Mensaje de sincronización */}
+      {syncMsg && (
+        <motion.div initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0}}
+          className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${syncMsg.ok ? "bg-[#F0FDF4] border border-[#BBF7D0] text-[#16A34A]" : "bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626]"}`}>
+          {syncMsg.text}
+        </motion.div>
+      )}
 
       {/* Barra de búsqueda + filtros */}
       <div className="bg-white rounded-xl border border-[#E5E5E0] p-4 flex flex-wrap items-center gap-3">

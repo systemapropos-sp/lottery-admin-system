@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Unlock, Save, Trophy, Calendar } from "lucide-react";
 import DataTable from "@/components/ui/DataTable";
@@ -24,6 +24,11 @@ interface ResultLog {
   nuevo: string;
 }
 
+// ── Helper: format numbers array as "12-34-56" for logs ──────────────────────
+function formatNums(numbers: string[]): string {
+  return numbers.slice(0, 3).filter(Boolean).join('-') || '-';
+}
+
 function generateInitialResults(sorteos?: { id: string; nombre: string; color: string }[]): ResultEntry[] {
   const list = sorteos && sorteos.length > 0 ? sorteos : [];
   return list.map((s) => ({
@@ -35,16 +40,6 @@ function generateInitialResults(sorteos?: { id: string; nombre: string; color: s
   }));
 }
 
-function generateResultLogs(): ResultLog[] {
-  return [
-    { id: "log-001", fecha: "2024-05-15T10:15:00Z", sorteo: "Anguila 10AM", usuario: "mmwrduser", accion: "Creo", anterior: "-", nuevo: "12-34-56" },
-    { id: "log-002", fecha: "2024-05-15T10:20:00Z", sorteo: "Anguila 10AM", usuario: "mmwrduser", accion: "Modifico", anterior: "12-34-56", nuevo: "12-34-57" },
-    { id: "log-003", fecha: "2024-05-15T13:10:00Z", sorteo: "LOTEDOM", usuario: "sfm056", accion: "Creo", anterior: "-", nuevo: "44-55-66" },
-    { id: "log-004", fecha: "2024-05-14T18:30:00Z", sorteo: "Anguila 6PM", usuario: "mmwrduser", accion: "Bloqueo", anterior: "45-67-89", nuevo: "45-67-89" },
-    { id: "log-005", fecha: "2024-05-14T21:05:00Z", sorteo: "Anguila 9PM", usuario: "vale", accion: "Modifico", anterior: "01-02-03", nuevo: "01-02-04" },
-    { id: "log-006", fecha: "2024-05-13T10:30:00Z", sorteo: "LA PRIMERA", usuario: "mmwrduser", accion: "Creo", anterior: "-", nuevo: "11-22-33" },
-  ];
-}
 
 const accionConfig: Record<string, string> = {
   "Creo": "bg-blue-100 text-blue-800",
@@ -123,12 +118,53 @@ export default function Resultados() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loadingFromDB, setLoadingFromDB] = useState(false);
   const [processMsg, setProcessMsg] = useState<string | null>(null);
+  // ── Logs state ──────────────────────────────────────────────────────────────
+  const [logs, setLogs] = useState<ResultLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   // Get sorteos — use stable ref (no .filter in selector to avoid infinite loop)
   const allSorteos = useSorteosStore((s) => s.sorteos);
   const sorteos = useMemo(() => allSorteos.filter((x) => x.activo), [allSorteos]);
 
-  // Load/reload results whenever date OR sorteos list changes
+  // ── Load logs from Supabase ─────────────────────────────────────────────────
+  const loadLogs = useCallback(async (date: string) => {
+    setLogsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("resultado_logs")
+        .select("*")
+        .eq("draw_date", date)
+        .eq("business_id", "bb000001-0000-0000-0000-000000000001")
+        .order("created_at", { ascending: false });
+      if (!error && data) {
+        setLogs(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (data as any[]).map((row) => ({
+            id: row.id,
+            fecha: row.created_at,
+            sorteo: row.lottery_name,
+            usuario: row.usuario,
+            accion: row.accion,
+            anterior: row.anterior || "-",
+            nuevo: row.nuevo,
+          }))
+        );
+      } else {
+        setLogs([]); // table may not exist yet — show empty gracefully
+      }
+    } catch {
+      setLogs([]); // if table doesn't exist yet, just show empty
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
+
+  // Reload logs when Logs tab becomes active or date changes
+  useEffect(() => {
+    if (activeTab === 1) loadLogs(selectedDate);
+  }, [activeTab, selectedDate, loadLogs]);
+
+  // ── Load/reload results whenever date OR sorteos list changes ───────────────
   useEffect(() => {
     // Guard: wait for store to hydrate (never show blank page)
     if (sorteos.length === 0) return;
@@ -201,6 +237,20 @@ export default function Resultados() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // ── 0. Cargar resultados anteriores para detectar Creo vs Modifico ────────
+      const { data: existingData } = await supabase
+        .from("lottery_results")
+        .select("lottery_name, primera, segunda, tercera, pick3, pick4")
+        .eq("draw_date", selectedDate);
+
+      const existingMap: Record<string, { primera?: string; segunda?: string; tercera?: string; pick3?: string; pick4?: string }> = {};
+      if (existingData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (existingData as any[]).forEach(row => {
+          existingMap[row.lottery_name] = row;
+        });
+      }
+
       const rows = results
         .filter(r => r.numbers.some(n => n && n.trim()))
         .map(r => {
@@ -228,6 +278,67 @@ export default function Resultados() {
           .from("sortition_results")
           .upsert(rows, { onConflict: "admin_id,sorteo_name,fecha" });
         if (error) throw error;
+      }
+
+      // ── También escribir a lottery_results (portal vendedor + cliente móvil) ──
+      const lotteryRows = results
+        .filter(r => r.numbers.some(n => n && n.trim()))
+        .map(r => {
+          const sorteo = sorteos.find(s => s.id === r.lotteryId || s.nombre === r.lotteryName);
+          return {
+            lottery_name:  r.lotteryName,
+            draw_date:     selectedDate,
+            draw_time:     sorteo?.horario || null,
+            primera:       r.numbers[0] || null,
+            segunda:       r.numbers[1] || null,
+            tercera:       r.numbers[2] || null,
+            pick3:         r.numbers[3] || null,
+            pick4:         r.numbers[4] || null,
+            company:       inferCategory(r.lotteryName),
+            color:         sorteo?.color || r.color || null,
+            admin_id:      "RDV-01",
+            business_id:   "bb000001-0000-0000-0000-000000000001",
+            updated_at:    new Date().toISOString(),
+          };
+        });
+      if (lotteryRows.length > 0) {
+        await supabase
+          .from("lottery_results")
+          .upsert(lotteryRows, { onConflict: "lottery_name,draw_date" });
+      }
+
+      // ── Insertar logs de resultado_logs ────────────────────────────────────
+      const logRows = results
+        .filter(r => r.numbers.some(n => n && n.trim()))
+        .map(r => {
+          const nuevoStr = formatNums(r.numbers);
+          const existing = existingMap[r.lotteryName];
+          let anterior = "-";
+          let accion = "Creo";
+          if (existing) {
+            const oldNums = [existing.primera, existing.segunda, existing.tercera].filter(Boolean).join("-");
+            if (oldNums) {
+              anterior = oldNums;
+              accion = "Modifico";
+            }
+          }
+          return {
+            business_id: "bb000001-0000-0000-0000-000000000001",
+            draw_date: selectedDate,
+            lottery_name: r.lotteryName,
+            usuario: localStorage.getItem("nmv_admin_user") || "admin",
+            accion,
+            anterior,
+            nuevo: nuevoStr,
+          };
+        });
+      if (logRows.length > 0) {
+        // Insert (not upsert) — each save creates a new log entry
+        await supabase.from("resultado_logs").insert(logRows).then(({ error }) => {
+          if (error) console.warn("resultado_logs insert:", error.message); // non-fatal
+        });
+        // Refresh logs if on Logs tab
+        if (activeTab === 1) loadLogs(selectedDate);
       }
 
       // Backward compat: also update admin_config.resultados
@@ -517,8 +628,18 @@ export default function Resultados() {
           <motion.div key="logs"
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
             {logFilters}
-            <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              <DataTable columns={logColumns} data={generateResultLogs()} keyExtractor={(r) => r.id} pageSize={10} />
+          <div className="bg-white rounded-xl border border-[#E5E5E0] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              {logsLoading ? (
+                <div className="text-center py-10 text-[#999] text-sm">Cargando logs...</div>
+              ) : logs.length === 0 ? (
+                <div className="text-center py-10 text-[#bbb] text-sm">
+                  <div className="text-3xl mb-2">📋</div>
+                  <div>No hay logs para esta fecha.</div>
+                  <div className="text-xs mt-1 text-[#ccc]">Los logs se crean automáticamente al guardar resultados.</div>
+                </div>
+              ) : (
+                <DataTable columns={logColumns} data={logs} keyExtractor={(r) => r.id} pageSize={10} />
+              )}
             </div>
           </motion.div>
         )}
