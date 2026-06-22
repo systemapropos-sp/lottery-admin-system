@@ -176,11 +176,11 @@ export default function Resultados() {
       // Show all sorteos with empty fields immediately — prevents blank page
       setResults(base);
       try {
-        // ── Lee de lottery_results (misma tabla donde handleSave escribe) ──
+        // ── Lee de lottery_results — columna real se llama result_date ──
         const { data, error } = await supabase
           .from("lottery_results")
           .select("*")
-          .eq("draw_date", selectedDate);
+          .eq("result_date", selectedDate);
 
         if (!error && data && data.length > 0) {
           setResults(base.map(entry => {
@@ -241,7 +241,7 @@ export default function Resultados() {
       const { data: existingData } = await supabase
         .from("lottery_results")
         .select("lottery_name, primera, segunda, tercera, pick3, pick4")
-        .eq("draw_date", selectedDate);
+        .eq("result_date", selectedDate);
 
       const existingMap: Record<string, { primera?: string; segunda?: string; tercera?: string; pick3?: string; pick4?: string }> = {};
       if (existingData) {
@@ -287,7 +287,7 @@ export default function Resultados() {
           const sorteo = sorteos.find(s => s.id === r.lotteryId || s.nombre === r.lotteryName);
           return {
             lottery_name:  r.lotteryName,
-            draw_date:     selectedDate,
+            result_date:   selectedDate,
             draw_time:     sorteo?.horario || null,
             primera:       r.numbers[0] || null,
             segunda:       r.numbers[1] || null,
@@ -304,7 +304,7 @@ export default function Resultados() {
       if (lotteryRows.length > 0) {
         await supabase
           .from("lottery_results")
-          .upsert(lotteryRows, { onConflict: "lottery_name,draw_date" });
+          .upsert(lotteryRows, { onConflict: "lottery_name,result_date" });
       }
 
       // ── Insertar logs de resultado_logs ────────────────────────────────────
