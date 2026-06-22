@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Unlock, Save, Trophy, Calendar } from "lucide-react";
+import { Lock, Unlock, Save, Trophy, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import DataTable from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
 import { supabase } from "@/lib/supabase";
@@ -454,12 +454,60 @@ export default function Resultados() {
     },
   ];
 
+  // ── Date navigation helpers for Logs tab ──────────────────────────────────
+  const shiftLogDate = (days: number) => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    const next = d.toISOString().split('T')[0];
+    // Don't allow going past today
+    if (days > 0 && next > todayStr()) return;
+    setSelectedDate(next);
+  };
+  const isLogToday = selectedDate === todayStr();
+
   const logFilters = (
-    <div className="flex flex-wrap items-end gap-4 mb-4">
-      <div className="flex flex-col gap-1.5 min-w-[140px]">
+    <div className="flex flex-wrap items-end gap-3 mb-4">
+      <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-[#666666] uppercase tracking-wider flex items-center gap-1"><Calendar size={12} /> Fecha</label>
-        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-          className="w-full px-3 py-2.5 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] transition-colors" />
+        <div className="flex items-center gap-1">
+          {/* ← Día anterior */}
+          <button
+            onClick={() => shiftLogDate(-1)}
+            title="Día anterior"
+            className="flex items-center justify-center w-9 h-9 rounded-lg border border-[#E5E5E0] bg-white text-[#4ECDC4] hover:bg-[#F0FFFE] hover:border-[#4ECDC4] transition-colors"
+          >
+            <ChevronLeft size={16} strokeWidth={2.5} />
+          </button>
+          {/* Date input */}
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="px-3 py-2 text-sm border border-[#E5E5E0] rounded-lg bg-white focus:outline-none focus:border-[#4ECDC4] transition-colors"
+          />
+          {/* → Día siguiente */}
+          <button
+            onClick={() => shiftLogDate(1)}
+            disabled={isLogToday}
+            title={isLogToday ? 'Ya estás en hoy' : 'Día siguiente'}
+            className={`flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${
+              isLogToday
+                ? 'border-[#E5E5E0] bg-[#F8F8F5] text-[#C0C0C0] cursor-not-allowed'
+                : 'border-[#E5E5E0] bg-white text-[#4ECDC4] hover:bg-[#F0FFFE] hover:border-[#4ECDC4]'
+            }`}
+          >
+            <ChevronRight size={16} strokeWidth={2.5} />
+          </button>
+          {/* Hoy button — visible only when not on today */}
+          {!isLogToday && (
+            <button
+              onClick={() => setSelectedDate(todayStr())}
+              className="px-3 py-2 text-xs font-semibold text-[#4ECDC4] border border-[#4ECDC4] rounded-lg bg-[#F0FFFE] hover:bg-[#E0FAF8] transition-colors"
+            >
+              Hoy
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
