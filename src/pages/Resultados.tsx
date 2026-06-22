@@ -176,27 +176,27 @@ export default function Resultados() {
       // Show all sorteos with empty fields immediately — prevents blank page
       setResults(base);
       try {
+        // ── Lee de lottery_results (misma tabla donde handleSave escribe) ──
         const { data, error } = await supabase
-          .from("sortition_results")
+          .from("lottery_results")
           .select("*")
-          .eq("fecha", selectedDate)
-          .eq("admin_id", "RDV-01");
+          .eq("draw_date", selectedDate);
 
         if (!error && data && data.length > 0) {
           setResults(base.map(entry => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const row = (data as any[]).find(d =>
-              d.sorteo_name === entry.lotteryName || d.lottery_id === entry.lotteryId
+              d.lottery_name?.toLowerCase() === entry.lotteryName?.toLowerCase()
             );
             if (!row) return entry;
             return {
               ...entry,
               numbers: [
-                (row.num1 || "").slice(0, 2),
-                (row.num2 || "").slice(0, 2),
-                (row.num3 || "").slice(0, 2),
-                (row.p3 || "").slice(0, 4),
-                (row.p4 || "").slice(0, 4),
+                (row.primera || "").slice(0, 2),
+                (row.segunda || "").slice(0, 2),
+                (row.tercera || "").slice(0, 2),
+                (row.pick3 || "").slice(0, 4),
+                (row.pick4 || "").slice(0, 4),
               ],
               locked: row.locked ?? false,
             };

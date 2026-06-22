@@ -22,18 +22,17 @@ CREATE TABLE IF NOT EXISTS resultado_logs (
 CREATE INDEX IF NOT EXISTS resultado_logs_date_biz
   ON resultado_logs (draw_date, business_id);
 
--- Enable Row Level Security (optional but recommended)
+-- Enable Row Level Security
 ALTER TABLE resultado_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow service_role full access (used by admin server-side)
-CREATE POLICY IF NOT EXISTS "service_role full access"
+-- NOTE: PostgreSQL does NOT support "CREATE POLICY IF NOT EXISTS"
+-- If you get a "policy already exists" error, skip these two lines.
+CREATE POLICY "service_role full access"
   ON resultado_logs FOR ALL
   USING (true)
   WITH CHECK (true);
 
--- Allow anon authenticated read (for view-only queries from admin UI)
--- The admin uses the supabase client with anon key, so we need insert/select too
-CREATE POLICY IF NOT EXISTS "anon insert and select"
+CREATE POLICY "anon insert and select"
   ON resultado_logs FOR ALL
   TO anon
   USING (true)
